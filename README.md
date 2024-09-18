@@ -64,7 +64,7 @@ There are several internal simulation variables that you can change in order to 
 on Z80 in various ways. The best way to create a Z80 test is to create a small test program.
 
 <details>
-<summary>For example, create a test like this:<summary>
+<summary>For example, create a test like this:</summary>
 
 ```
 ; test for IM2
@@ -105,14 +105,14 @@ im2vector
         ei
         retn
 ```
-</summary>
+</details>
 
 Functionally, this sequence does not make much sense, but it lets us test several things
 by inserting an NMI and INT at certain places we can trace what’s going on
 when the CPU is servicing those interrupts.
 
 <details>
-<summary>Assembler output:<summary>
+<summary>Assembler output:</summary>
 
 ```
                         ; test for IM2
