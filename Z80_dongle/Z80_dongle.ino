@@ -126,8 +126,13 @@ const unsigned int ramLen = 0x1000;
 byte ram[ ramLen ];
 const unsigned int ramMask = 0xFFF;
 
+// Buffer simulating IO space for Z80 to access
+const unsigned int ioLen = 0x100;
+byte io[ ioLen ];
+const unsigned int ioMask = 0xFF;
+
 // Temp buffer to store input line
-#define TEMP_SIZE 512
+static const int TEMP_SIZE = 3 * 256; // enough room for 256 byte intel hex code
 char temp[ TEMP_SIZE ];
 
 // Temp buffer to store extra dump information
@@ -356,13 +361,15 @@ void loop() {
             sprintf( extraInfo, "Memory write to  %04X <- %02X", ab, db );
         }
 
-        // Detect I/O read: We don't place anything on the bus
+        // Simulate I/O read
         if ( !iorq && !rd ) {
-            sprintf( extraInfo, "I/O read from %04X", ab );
+            SetDataToDB( io[ ab & ioMask ] );
+            sprintf( extraInfo, "I/O read from %04X -> %02X", ab, io[ ab & ioMask ] );
         }
 
-        // Detect I/O write
+        // Simulate I/O write
         if ( !iorq && !wr ) {
+            io[ ab & ioMask ] = db;
             sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
         }
 
@@ -470,17 +477,21 @@ control:
                 // This is used to input Intel HEX format values into the RAM buffer
                 // Multiple lines may be pasted. They are separated by a space character.
                 char *pTemp = temp;
-                while ( *pTemp == ':' ) {
+                while ( *pTemp == ':' || *pTemp == '.' ) {
+                    bool isRam = *pTemp == ':';
                     byte bytes = hex( ++pTemp ); // skip ':', start with hex number
                     if ( bytes > 0 ) {
                         adr = ( hex( pTemp + 2 ) << 8 ) + hex( pTemp + 4 );
                         // byte recordType = hex( pTemp + 6 );
-                        // pf( F( "%04X:" ), address );
+                        if ( verboseMode ) pf( F( "%04X:" ), adr );
                         for ( int i = 0; i < bytes; i++ ) {
-                            ram[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
-                            //pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
+                            if ( isRam )
+                                ram[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
+                            else
+                                io[ ( adr + i ) & ioMask ] = hex( pTemp + 8 + 2 * i );
+                            if ( verboseMode ) pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
                         }
-                        // pf( F( "\r\n" ) );
+                        if ( verboseMode ) pf( F( "\r\n" ) );
                     }
                     pTemp += 2 * bytes + 10; // Skip to the next possible line of hex entry
                     while ( *pTemp && isspace( *pTemp ) )
@@ -496,14 +507,14 @@ control:
                     running = true;
                 }
 
-                // Option "sc" : clear simulation variables to their default values
-                if ( temp[ 0 ] == 's' && temp[ 1 ] == 'c' ) {
+                // Option "sR" : reset simulation variables to their default values
+                if ( temp[ 0 ] == 's' && temp[ 1 ] == 'R' ) {
                     ResetSimulationVars();
                     temp[ 1 ] = 0; // Proceed to dump all variables...
                 }
 
                 // Option "s"  : show and set internal control variables
-                if ( temp[ 0 ] == 's' && temp[ 1 ] != 'c' ) {
+                if ( temp[ 0 ] == 's' ) {
                     // Show or set the simulation parameters
                     int var = 0, value;
                     int args = sscanf( &temp[ 1 ], "%d %d", &var, &value );
@@ -556,13 +567,19 @@ control:
                     pf( F( "#12 Push IORQ vector #(hex)  = %02X\r\n" ), iorqVector );
                 }
 
-                if ( temp[ 0 ] == 'm' && temp[ 1 ] == 'c' ) {
-                    // Option "mc"  : clear RAM memory
+                if ( temp[ 0 ] == 'm' && temp[ 1 ] == 'R' ) {
+                    // Option "mR"  : reset RAM memory
                     memset( ram, 0, sizeof( ram ) );
-                    pf( F( "RAM cleared\r\n" ) );
-                } else if ( temp[0] == 'm' && temp[1] == 's' ) {
+                    pf( F( "RAM reset to 00\r\n" ) );
+                } else if ( temp[ 0 ] == 'i' && temp[ 1 ] == 'R' ) {
+                    // Option "iR"  : reset IO memory
+                    memset( io, 0, sizeof( io ) );
+                    pf( F( "IO reset to 00\r\n" ) );
+                } else if ( ( temp[0] == 'm' || temp[ 0 ] == 'i' ) && temp[1] == 's' ) {
                     // Option "ms"  : set RAM memory from ADR to byte(s) B
-                    // ms ADR B B B ...
+                    // Option "is"  : set IO memory from ADR to byte(s) B
+                    // ms/is ADR B B B ...
+                    bool isRam = temp[ 0 ] == 'm';
                     int i = 2;
                     if ( !isxdigit( temp[2] ) )
                         i = nextHex( temp, 0 ); // skip to start of adr
@@ -570,26 +587,32 @@ control:
                     if ( i &&  sscanf( pTemp + i, "%04X ", &adr ) == 1 ) {
                         end = adr;
                         while ( ( i = nextHex( pTemp, i ) ) ) {
-                            if ( end >= ramLen )
+                            if ( end >= ( isRam ? ramLen : ioLen ) )
                                 break;
-                            if ( sscanf( pTemp + i, "%2X", &val ) == 1 )
-                                ram[ (end++) ] = val;
-                            else
+                            if ( sscanf( pTemp + i, "%2X", &val ) == 1 ) {
+                                if ( isRam )
+                                    ram[ end++ ] = val;
+                                else
+                                    io[ end++ ] = val;
+                            } else
                                 break;
                         }
-                        pTemp[1] = 0; // "fall through" to mem dump
+                        pTemp[1] = 0; // "fall through" to mem/io dump
                     }
                 }
 
-                if ( temp[ 0 ] == 'm' ) {
+                if ( temp[ 0 ] == 'm' || temp[ 0 ] == 'i' ) {
                     // Option "m START END"  : dump RAM memory
+                    // Option "i START END"  : dump IO memory
                     // START and END are optional
                     // START defaults to 0 or ADR from "ms adr ..."
                     // END defaults to START + 0x100
                     // Option "mx" : same in intel hex format
-                    int i = 1, hex = 0, rc = 0;
+                    bool isRam = temp[ 0 ] == 'm';
+                    bool isHex = false;
+                    int i = 1, rc = 0;
                     if ( temp[1] == 'x' ) {
-                        hex = 1;
+                        isHex = true;
                         i = 2;
                     }
                     if ( !isxdigit( temp[i] ) )
@@ -599,32 +622,54 @@ control:
                     adr &= 0xFF0; // fit to line
                     if ( !end && rc && ( i = nextHex( temp, i ) ) ) // one more argument
                         rc = sscanf( temp + i, "%04X", &end );
-                    if ( !end )
-                        end = adr + 0x100;
-                    if ( end > ramLen )
-                        end = ramLen - 1;
-                    if ( hex ) {
+                    if ( isRam ) {
+                        if ( !end )
+                            end = adr + 0x100;
+                        if ( end > ramLen )
+                            end = ramLen - 1;
+                    } else { // IO
+                        if ( !end )
+                            end = ioLen - 1;
+                    }
+                    if ( isHex ) { //
                         for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
-                            pf( F( ":10%04X00" ), aaa & ramMask );
+                            if ( isRam )
+                                pf( F( ":10%04X00" ), aaa & ramMask );
+                            else
+                                pf( F( ".10%04X00" ), aaa & ioMask );
                             unsigned char cs = 0;
                             cs -= 0x10; // datalen
                             cs -= (aaa) & 0xFF;
                             cs -= (aaa >> 8) & 0x0F;
                             for ( int j = 0; j < 0x10; j++ ) {
-                                unsigned char val = ram[ ( aaa + j ) & ramMask ];
+                                unsigned char val;
+                                if ( isRam )
+                                    val = ram[ ( aaa + j ) & ramMask ];
+                                else
+                                    val = io[ ( aaa + j ) & ioMask ];
                                 pf( "%02X",  val );
                                 cs -= val;
                             }
                             pf( "%02X\r\n", cs );
                         }
-                        pf( F( ":00000001FF\r\n" ) );
-                    } else {
-                        pf( F( "       00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ) );
+                        if ( isRam )
+                            pf( F( ":00000001FF\r\n" ) );
+                        else
+                            pf( F( ".00000001FF\r\n" ) );
+                    } else { // normal dump, RAM or IO
+                        pf( F( " %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ),
+                               isRam ? "MEM" : " IO" );
                         pf( F( "--------------------------------------------------------+\r\n" ) );
                         for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
-                            pf( F( "%04X : " ), aaa & ramMask );
+                            if ( isRam )
+                                pf( F( "%04X : " ), aaa & ramMask );
+                            else
+                                pf( F( "%04X : " ), aaa & ioMask );
                             for ( int j = 0; j < 16; j++ ) {
-                                pf( F( "%02X " ), ram[ ( aaa + j ) & ramMask ] );
+                                if ( isRam )
+                                    pf( F( "%02X " ), ram[ ( aaa + j ) & ramMask ] );
+                                else
+                                    pf( F( "%02X " ), io[ ( aaa + j ) & ioMask ] );
                                 if ( j == 7 )
                                     pf( F( " " ) );
                             }
@@ -640,13 +685,18 @@ control:
                     pf( F( "e1              - set echo on\r\n" ) );
                     pf( F( "s               - show simulation variables\r\n" ) );
                     pf( F( "s N VALUE       - set simulation variable number N to a VALUE\r\n" ) );
-                    pf( F( "sc              - clear simulation variables to their default values\r\n" ) );
+                    pf( F( "sR              - reset simulation variables to their default values\r\n" ) );
                     pf( F( "r               - restart the simulation\r\n" ) );
-                    pf( F( ":INTEL-HEX      - reload RAM buffer with a given data stream\r\n" ) );
+                    pf( F( ":INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
+                    pf( F( ".INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
                     pf( F( "m START END     - dump the RAM buffer from START to END\r\n" ) );
                     pf( F( "mx START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
-                    pf( F( "mc              - clear the RAM buffer\r\n" ) );
+                    pf( F( "mR              - reset the RAM buffer to 00\r\n" ) );
                     pf( F( "ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
+                    pf( F( "i START END     - dump the IO buffer from START to END\r\n" ) );
+                    pf( F( "ix START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
+                    pf( F( "iR              - reset the IO buffer to 00\r\n" ) );
+                    pf( F( "is ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
                     pf( F( "vN              - set verboseMode to N (default = 0)\r\n" ) );
                 }
             }

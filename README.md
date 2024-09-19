@@ -1,53 +1,68 @@
 # Arduino and ZiLOG Z80
 
-If you want to find out exactly what a venerable Z80 is doing on its bus
-while executing instructions, in this post I outlined a dongle and the software
-that will let you see that. Using just a few components and connecting them
-to an Arduino Mega, you can trace instructions clock by clock and observe what’s
-happening on the bus.
+The idea and the software is taken from [Goran Devic](https://baltazarstudios.com/arduino-zilog-z80/).
 
-Start with a proto-board and solder down components following this schematics:
+If you want to find out exactly what a venerable Z80 is doing on its bus
+while executing instructions, my hardware and the firmware will let you see that.
+Using just a few components and connecting them to an Arduino Mega, you can trace
+instructions clock by clock and observe what's happening on the bus.
+
+## Hardware
+
+This is a 1st rough sketch, taken from Goran's post:
 
 ![Arduino + Z80 "schematics"](arduino-z80-schematics.jpg)
 
+These are the actual connections on my proto board:
+
+![Wiring Z80_dongle](Wiring_Z80_dongle.png)
+
 There is a capacitor between +5V and GND which should help keep away any voltage noise.
-You can use anything: I had a 0.1uF tantalum cap that I used. The evil thing with not
+You can use anything: I use a 2.2uF tantalum cap. The evil thing with not
 putting bypass (or decoupling) caps in your designs is that you may never find out
 why they might behave erratically.
 
-There is also a push-button, which is optional. You might think it would be connected
-to the reset pin but it is connected to the CLK – I wanted to be able to manually
-clock the Z80 to see if it worked before hooking it up to Arduino. For the same reason,
-every Z80 control input pin has a weak pull-up resistor. That should make it “alive and
-kicking” right off the bat without the need for anything else externally driving it.
+There is also a push button, which is optional. In contrast to Goran's *sketch* above
+it is connected to the /RESET pin of the Z80 CPU.
+A Schottky diode decouples this reset button from the Arduino output.
 
 Now, the most interesting extension to the design is a tri-state bus detection.
-Z80 occasionally puts its address and data buses into “High-Z”, or tri-state,
-and I wanted to detect that (it also lets most of its control pins to Z,
-but I was content to detect only the major buses.) There are 2+2 resistors
-(each 10K) making up a weak resistor divider network connected to pins D0 and A0.
+
+Z80 occasionally puts its address and data buses into `High-Z`, or tri-state,
+and to detect that (it also lets some of its control pins to Z,
+but it is sufficien to detect only the two major buses.) There are 2 pull-down resistors
+(each 10K) making up a weak resistor divider network together with the pull-ups connected
+to pins D0 and A0.
 That way, whenever Z80 releases its data or address bus, the pins will assume 2.5V
-pulled by resistor dividers. Since both buses are connected to analog input pins,
-Arduino will be able to read the voltage and clearly detect that they are not
+pulled by resistor dividers. Since both bus pins A0 and D0 are also connected to analog
+input pins, Arduino will be able to read the voltage and clearly detect that they are not
 0V or 5V (logical 0 or 1) but somewhere in between.
 
-After verifying that my 25-year old Z80 chip from my parts bin is still working (!),
-I connected it to an Arduino Mega board. Mega is really useful here since it hosts
-more I/O pins than you’d ever need, runs on +5V, and therefore needs no voltage
-level translators to talk to Z80.
+The Arduino Mega board is really useful here since it hosts more I/O pins than you'd
+ever need, runs on +5V, and therefore needs no voltage level translators to talk to Z80.
 
-The connectors are conveniently clustered by their function: All eight data wires together,
-address wires (I only used 8 for a max address space of 256 bytes), control signals
-in two groups (one from each side of the Z80 package), and a few odd ones: clock,
-which goes to pin 13 on Arduino and also powers the LED on it, and +5V and GND.
-You can click on an image below to zoom on it —
+The Mega ports are conveniently clustered by their function:
+All eight data wires together, 16 address wires, control signals, and a few odd ones:
+clock, which goes to pin 10 on Arduino which is a PWM output that allows to clock the CPU,
+also +5V and GND.
 
-The time is to write some software. Being a software engineer by trade comes in really useful
-since many great hardware hobbyists totally drop the ball when it’s time to blow a breath of
-life into their designs and write code, so they skim over that part. The Arduino software
-that runs this dongle can be downloaded here.
+I got the Mega proto board, the Textool (clone) socket and some Z80 CPUs from Hein Pragt's
+retro electronics part [webshop](https://www.heinpragt.nl/). Hein uses a similar
+[Z80 / Arduino setup](https://www.heinpragt-software.com/z80-on-arduimo-mega/)
+to run Z80 programs using the Arduino Mega as ROM, RAM, and IO interface.
+I use the same connections for my Z80 dongle as Hein, so his SW (e.g. a Basic interpreter)
+runs also on this dongle.
 
-Connected through a serial port, you have several commands available (type “?” or “h”
+## Firmware
+
+The Mega firmware is taken from Goran, I adapted it to my changed connections and added
+commands for memory modification and memory dump.
+
+The Arduino communicates via the USB serial connection to the PC with 115200 bps,
+you can use either the serial monitor of the Arduino IDE or any serial terminal program.
+I use e.g. minicom on Linux.
+
+Connected through a serial port, you have several commands available (type `?` or `h`
 at the console):
 
 ```
@@ -55,13 +70,18 @@ e0              - set echo off (default)
 e1              - set echo on
 s               - show simulation variables
 s N VALUE       - set simulation variable number N to a VALUE
-sc              - clear simulation variables to their default values
+sR              - reset simulation variables to their default values
 r               - restart the simulation
-:INTEL-HEX      - reload RAM buffer with a given data stream
+:INTEL-HEX      - reload RAM buffer with ihex data stream
+.INTEL-HEX      - reload IO buffer with a modified ihex data stream
 m START END     - dump the RAM buffer from START to END
 mx START END    - dump the RAM buffer as ihex from START to END
-mc              - clear the RAM buffer
+mR              - reset the RAM buffer to 00
 ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B
+i START END     - dump the IO buffer from START to END
+ix START END    - dump the IO buffer as modified ihex from START to END
+iR              - reset the IO buffer to 00
+is ADR B B B .. - set IO buffer at ADR with data byte(s) B
 vN              - set verboseMode to N (default = 0)
 ```
 
@@ -69,6 +89,8 @@ There are several internal simulation variables that you can change in order to 
 on Z80 in various ways. The best way is to create a small test program.
 I use the `z80assembler` from the [sarnau/Z80DisAssembler](https://github.com/sarnau/Z80DisAssembler)
 package.
+
+## Analysing the Z80
 
 <details>
 <summary>For example, create a test like this:</summary>
@@ -115,7 +137,7 @@ im2vector
 </details>
 
 Functionally, this sequence does not make much sense, but it lets us test several things
-by inserting an NMI and INT at certain places we can trace what’s going on
+by inserting an NMI and INT at certain places we can trace what's going on
 when the CPU is servicing those interrupts.
 
 <details>
@@ -188,6 +210,7 @@ Using RAM range [0x0000...0x0069]
 
 Open an Intel-style hex file
 that will show the code in hex; copy all and paste it into the Arduino serial terminal.
+You can paste IHEX files up to 768 byte, this is enough for 256 byte program code.
 
 ```
 :200000002116003100013E55770E55ED713E00ED47ED5EFB18FE00000000000000000000DE
@@ -197,8 +220,8 @@ that will show the code in hex; copy all and paste it into the Arduino serial te
 :00000001FF
 ```
 
-Arduino will happily respond that it stored the stream of bytes and you can issue a command “m”
-to dump the buffer (which Z80 sees as its RAM) to confirm that it is there:
+Now you can issue a command `m` to dump the buffer (which Z80 sees as its RAM)
+to confirm that it is there:
 
 ```
 m 0 80
@@ -230,7 +253,7 @@ mx 0 80
 :00000001FF
 ```
 
-Typing command “s” will show simulation variables that are available to us:
+Typing command `s` will show simulation variables that are available to us:
 
 ```
 s
@@ -256,7 +279,7 @@ the most up-to-date software version.
 
 As it runs, the trace program counts clocks and, by setting those variables, you can toggle
 specific control pins at determined times. For example, if you want to issue an INT at clock 120,
-you would do “s 6 120”. You can optionally dump what’s happening on both clock phases and not
+you would do `s 6 120`. You can optionally dump what's happening on both clock phases and not
 only on the positive phase (variable #0). Variable #1 will show or hide memory refresh cycles
 that accompany M1.
 
@@ -280,11 +303,11 @@ s 6 120
 
 The program will run for 200 clock cycles (`s 3 200`), issue an interrupt at clock 120 (`s 6 120`),
 clear it at clock 130 (`s 11 130`)and will push 0x30 (`s12 30`) at int vector request (M1 = low & IORQ = low).
-Start the trace by issuing a command “r”. The Arduino starts the clocks and issues a RESET
+Start the trace by issuing a command `r`. The Arduino starts the clocks and issues a RESET
 sequence to Z80 after which your code runs and bus values are dumped out.
 
 Notice the tri-state detection – when the address or data bus is being tri-stated by Z80,
-the program outputs “–“. In fact, the data bus is being tri-stated most of the time!
+the program outputs `–`. In fact, the data bus is being tri-stated most of the time!
 This is a dump from parts of the run.
 
 ```
@@ -760,3 +783,76 @@ Finally variable #12 can be used to push an arbitrary IORQ vector when needed.
 Overall, the dongle itself and the options implemented by the Arduino [software](Z80_dongle/Z80_dongle.ino)
 provide a powerful way to examine and visualize Z80 behavior whether it is running undocumented
 opcodes or responding to a sequence of external control pins like interrupts, bus requests, etc.
+
+## Detect CPU types
+
+With undocumented behaviour, you can distinguish some CPU types.
+
+Assemble the program [CPU_detect.asm](CPU_detect.asm).
+
+<details><summary>Source code</summary>
+
+```
+; use undocumented out command
+    ld c,0
+    out (c),0   ; NMOS writes 00, CMOS writes FF
+
+; detect CPU
+; https://github.com/EtchedPixels/FUZIX/blob/master/Applications/util/cpuinfo-z80.S
+
+    ld sp,$80
+    ld bc,0x00ff
+    push bc
+    pop af      ; Flags is now 0xFF A is 0. Now play with XF and YF
+    scf         ; Will give us 0 for NEC clones, 28 for Zilog
+    nop
+    push af
+    pop bc
+    ld a,c
+    and $28
+    out (1),a
+
+    nop
+    nop
+
+; detect U880
+
+    ld  hl,$ffff
+    ld  bc,$0102
+    scf
+    outi
+    jp  c,U880
+; Not a U880 CPU
+Z80:
+    ld a,$80
+    out (c),a
+    halt
+
+; A U880 CPU
+U880:
+    ld a,$88
+    out (c),a
+    halt
+```
+</details>
+
+Load the IHEX data:
+
+```
+:200000000E00ED7131800001FF00C5F13700F5C179E628D301000021FFFF01020137EDA3DB
+:0D002000DA28003E80ED79763E88ED797695
+:00000001FF
+```
+And run it. Show the IO space with `i 0 10`:
+
+```
+  IO   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F
+--------------------------------------------------------+
+0000 : 00 28 80 00 00 00 00 00  00 00 00 00 00 00 00 00 |
+--------------------------------------------------------+
+```
+
+- Address 0: 00=NMOS, FF=CMOS
+- Address 1: 00=NEC, 28=Zilog (and compatible)
+- Address 2: 80=Z80, 88=U880
+

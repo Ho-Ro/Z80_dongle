@@ -5,3 +5,7 @@
 *.new
 *.old
 *.orig
+
+*.bin
+*.z80
+*.com
