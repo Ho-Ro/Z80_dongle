@@ -18,30 +18,43 @@
 //      - I/O map is _not_ implemented. Reads will return whatever happens
 //        to be on the data bus
 //
-// Copyright 2014 by Goran Devic
+// The analysis part of the SW is: Copyright 2014 by Goran Devic
 // This source code is released under the GPL v2 software license.
+//
+// The z80retroshield part of the SW is under the MIT License (MIT)
+// Copyright (c) 2019 Erturk Kocalar, http://8Bitforce.com/
+// Copyright (c) 2019 Steve Kemp, https://steve.kemp.fi/
+
+
 //------------------------------------------------------------------------
+
 #include <stdarg.h>
+#include <stdint.h>
+
 #include "WString.h"
+#include "z80retroshield.h"
+
+#include "NascomBasic.h"
+
 
 // Define Arduino Mega pins that are connected to a Z80 dongle board.
 
 // Address bus pins from Z80 are connected to PA (AL = A0..A7) and PC (AH = A8..A15) on Arduino
 #define P_AL PA
-#define DDR_AL  DDRA
+#define DDR_AL DDRA
 #define PORT_AL PORTA
-#define PIN_AL  PINA
+#define PIN_AL PINA
 #define P_AH PC
-#define DDR_AH  DDRC
+#define DDR_AH DDRC
 #define PORT_AH PORTC
-#define PIN_AH  PINC
+#define PIN_AH PINC
 #define AB0_sense A15 // read analog value from Z80 A0 to detect floating bus
 
 // Data bus pins from Z80 are connected to PL (D0..D7) on Arduino
 #define P_DB PL
-#define DDR_DB  DDRL
+#define DDR_DB DDRL
 #define PORT_DB PORTL
-#define PIN_DB  PINL
+#define PIN_DB PINL
 #define DB0_sense A8 // read analog value from Z80 D0 to detect floating bus
 
 
@@ -65,7 +78,7 @@
 // Tri-state detection values: the values that are read on analog pins
 // sensing the "high-Z" will differ based on the resistor values that make
 // up your voltage divider. Print your particular readings and adjust these:
-#define HI_Z_LOW  100 // Upper "0" value; low tri-state boundary
+#define HI_Z_LOW 100  // Upper "0" value; low tri-state boundary
 #define HI_Z_HIGH 600 // Low "1" value; upper tri-state boundary
 
 // Control *output* pins of Z80, we read them into these variables
@@ -86,8 +99,8 @@ int busrq = 1;
 int wait = 1;
 
 // Content of address and data wires
-int ab;
-byte db;
+uint16_t ab;
+uint8_t db;
 
 // Clock counter after reset
 int clkCount;
@@ -95,7 +108,7 @@ int clkCountHi;
 
 // T-cycle counter
 int T;
-int Mlast;
+int m1Prev;
 
 // M1-cycle counter
 int m1Count;
@@ -105,7 +118,7 @@ bool abTristated = false;
 bool dbTristated = false;
 
 // Simulation control variables
-bool running = 1;        // Simulation is running or is stopped
+bool running = 0;        // Simulation is running or is stopped
 int traceShowBothPhases; // Show both phases of a clock cycle
 int traceRefresh;        // Trace refresh cycles
 int tracePause;          // Pause for a key press every so many clocks
@@ -122,24 +135,47 @@ int clearAtClk;          // Clear all control signals at that clock number
 byte iorqVector;         // Push IORQ vector (default is FF)
 
 // Buffer containing RAM memory for Z80 to access
-const unsigned int ramLen = 0x1000;
-byte ram[ ramLen ];
-const unsigned int ramMask = 0xFFF;
+const uint16_t ramLen = 0x1000;
+// more RAM for Basic program
+// reuse as additional space for input and extra, tmp, ftmp
+uint8_t ram[ ramLen + 2560 ];
+const uint16_t ramMask = 0xFFF;
 
-// Buffer simulating IO space for Z80 to access
+static uint16_t ramBegin = 0;
+static uint16_t ramEnd = ramBegin + ramLen - 1;
+
+const uint16_t romLen = 0x2000;
+static uint16_t romBegin = 0;
+static uint16_t romEnd = romBegin + romLen - 1;
+
+// Temp buffer to store input line at the end of Basic RAM, unused at analyser
+static const int INPUT_SIZE = 1024; // enough room for ~400 byte intel hex code input
+char *input = (char *)ram + sizeof( ram ) - INPUT_SIZE;
+
+// Temp buffer for extra dump info, at the end of input buffer (unused during output)
+static const int EXTRA_SIZE = 64;
+char *extraInfo = (char *)ram + sizeof( ram ) - EXTRA_SIZE;
+
+// Buffer simulating IO space for Z80 to access, at unused Basic RAM before input buffer
 const unsigned int ioLen = 0x100;
-byte io[ ioLen ];
+byte *io = ram + sizeof( ram ) - INPUT_SIZE - ioLen;
 const unsigned int ioMask = 0xFF;
 
-// Temp buffer to store input line
-static const int TEMP_SIZE = 3 * 256; // enough room for 256 byte intel hex code
-char temp[ TEMP_SIZE ];
+const unsigned int tmpLen = 256;
+const unsigned int ftmpLen = 256;
+char *tmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen;
+char *ftmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
 
-// Temp buffer to store extra dump information
-char extraInfo[ 64 ] = { "" };
+int doEcho = 0;      // Echo received commands
+int verboseMode = 0; // Enable debugging output
 
-int doEcho = 0;          // Echo received commands
-int verboseMode;         // Enable debugging output
+bool runBasic = false;
+
+//
+// Our helper
+//
+Z80RetroShield cpu;
+
 
 // -----------------------------------------------------------
 // Arduino initialization entry point
@@ -150,6 +186,30 @@ void setup() {
     Serial.setTimeout( 1000L * 60 * 60 );
 
     pf( F( "\r\nZ80 Analyser V 1.0\r\n" ) );
+
+    //
+    // Empty the serial-buffer before we launch.
+    //
+    while ( Serial.available() )
+        Serial.read();
+
+    //
+    // Setup callbacks: RAM & ROM
+    //
+    cpu.set_memory_read( memory_read );
+    cpu.set_memory_write( memory_write );
+
+    //
+    // Setup callbacks: Port I/O
+    //
+    cpu.set_io_read( io_read );
+    cpu.set_io_write( io_write );
+
+    //
+    // We're now configured, show a pre-boot
+    // message.
+    //
+    // Serial.println("Launching Nascom ROM Basic:");
 
     ResetSimulationVars();
 
@@ -178,11 +238,15 @@ void setup() {
     pinMode( BUSRQ, OUTPUT );
     digitalWrite( WAIT, wait = HIGH );
     pinMode( WAIT, OUTPUT );
+
+    // Set all Z80 control inputs
     WriteControlPins();
+    extraInfo[ 0 ] = 0;
 
     // Perform a Z80 CPU reset
-    DoReset();
+    // DoReset();
 }
+
 
 // Resets all simulation variables to their defaults
 void ResetSimulationVars() {
@@ -202,6 +266,7 @@ void ResetSimulationVars() {
     verboseMode = 0;         // Enable debugging output
 }
 
+
 // Issue a RESET sequence to Z80 and reset internal counters
 void DoReset() {
     pf( F( "\r\n:Starting the clock\r\n" ) );
@@ -220,10 +285,11 @@ void DoReset() {
     // Do not count initial 2 clocks after the reset
     clkCount = -2;
     T = 0;
-    Mlast = 1;
+    m1Prev = 1;
     tracePauseCount = 0;
     m1Count = 0;
 }
+
 
 // Write all control pins into the Z80 dongle
 void WriteControlPins() {
@@ -234,6 +300,7 @@ void WriteControlPins() {
     digitalWrite( WAIT, wait ? HIGH : LOW );
 }
 
+
 // Set new data value into the Z80 data bus
 void SetDataToDB( byte data ) {
     DDR_DB = 0xFF; // output
@@ -241,6 +308,7 @@ void SetDataToDB( byte data ) {
     db = data;
     dbTristated = false;
 }
+
 
 // Read Z80 data bus (PINL) and store into db variable
 void GetDataFromDB() {
@@ -250,26 +318,27 @@ void GetDataFromDB() {
     // Detect if the data bus is tri-stated
     delayMicroseconds( 4 );
     int sense = analogRead( DB0_sense );
-    if ( verboseMode )
+    if ( verboseMode > 1 )
         pf( F( "DB0 sense: %4d\n" ), sense );
     // These numbers might need to be adjusted for each Arduino board
     dbTristated = sense > HI_Z_LOW && sense < HI_Z_HIGH;
-
     db = dbTristated ? 0xFF : PIN_DB;
 }
+
 
 // Read a value of Z80 address bus (PC:PA) and store it into the ab variable.
 // In addition, try to detect when a bus is tri-stated and write 0xFFF if so.
 void GetAddressFromAB() {
     // Detect if the address bus is tri-stated
     int sense = analogRead( AB0_sense );
-    if ( verboseMode )
+    if ( verboseMode > 1 )
         pf( F( "AB0 sense: %4d\n" ), sense );
     // These numbers might need to be adjusted for each Arduino board
     abTristated = sense > HI_Z_LOW && sense < HI_Z_HIGH;
 
-    ab = abTristated ? 0xFFFF : (PIN_AH << 8) + PIN_AL;
+    ab = abTristated ? 0xFFFF : ( PIN_AH << 8 ) + PIN_AL;
 }
+
 
 // Read all control pins on the Z80 and store them into internal variables
 void ReadControlState() {
@@ -283,6 +352,7 @@ void ReadControlState() {
     rd = digitalRead( RD );
 }
 
+
 // Dump the Z80 state as stored in internal variables
 void DumpState( bool suppress ) {
     if ( !suppress ) {
@@ -295,149 +365,113 @@ void DumpState( bool suppress ) {
             sprintf( dbStr, "%02X", db );
         if ( T == 1 && clkCountHi )
             pf( F( "--------------------------------------------------------------+\r\n" ) );
-        pf( F( "#%03d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s %s\r\n" ),
-            clkCount < 0 ? 0 : clkCount, clkCountHi ? 'H' : 'L', T, abStr, dbStr,
-            m1 ? "  " : "M1", rfsh ? "    " : "RFSH", mreq ? "    " : "MREQ",
-            rd ? "  " : "RD", wr ? "  " : "WR", iorq ? "    " : "IORQ",
-            busak ? "     " : "BUSAK", halt ? "    " : "HALT", zint ? "" : "[INT]",
-            nmi ? "" : "[NMI]", busrq ? "" : "[BUSRQ]", wait ? "" : "[WAIT]", extraInfo );
+        pf( F( "#%03d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s %s\r\n" ), clkCount < 0 ? 0 : clkCount,
+            clkCountHi ? 'H' : 'L', T, abStr, dbStr, m1 ? "  " : "M1", rfsh ? "    " : "RFSH", mreq ? "    " : "MREQ",
+            rd ? "  " : "RD", wr ? "  " : "WR", iorq ? "    " : "IORQ", busak ? "     " : "BUSAK", halt ? "    " : "HALT",
+            zint ? "" : "[INT]", nmi ? "" : "[NMI]", busrq ? "" : "[BUSRQ]", wait ? "" : "[WAIT]", extraInfo );
     }
     extraInfo[ 0 ] = 0;
 }
+
+
+//////////////////////////////////////////////////////////////////////
+// retroshield CB functions
+//////////////////////////////////////////////////////////////////////
+//
+// If the address is "low" read from our ROM.
+//
+// Otherwise read from our RAM-region.
+//
+//
+uint8_t memory_read( uint16_t address ) {
+    if ( address <= romEnd )
+        return ( pgm_read_byte_near( rom + address ) );
+    else if ( address <= ramEnd )
+        return ( ram[ address - ramBegin ] );
+    else {
+        if ( verboseMode )
+            pf( F( "*** Read error: %04X\n" ), address );
+        return ( 0 );
+    }
+}
+
+//
+// If the address is "high" write to our RAM.
+//
+//
+void memory_write( uint16_t address, uint8_t value ) {
+    if ( address >= ramBegin && address <= ramEnd )
+        ram[ address - ramBegin ] = value;
+    else if ( verboseMode )
+        pf( F( "*** Write error: %4X <- %2X\n" ), address, value );
+}
+
+//
+// I'm porting the (unchanged) BASIC here.
+//
+// So addresses are:
+//
+//   0  -> STDIN / Serial.read
+//   1  -> Meta / serial-console setup.
+//
+uint8_t io_read( uint16_t address ) {
+    //
+    // If the address is port 0 then the Z80
+    // is making a request for serial-data.
+    //
+    // This might be optimistic, or as a result
+    // of an interrupt.
+    //
+    // Ensure that the interrupt pin is disabled
+    // (i.e. set high, low is active), and return
+    // a byte of serial-input.
+    //
+    if ( address == 0 ) {
+        // Terminate interrupt.
+        digitalWrite( INT, HIGH );
+
+        char c = Serial.read();
+
+        if ( c < 0 )
+            return 0x00;
+        else
+            return (uint8_t)c;
+    }
+
+    //
+    // Read from an unhandled I/O port.
+    //
+    return 0x00;
+}
+
+//
+// I/O function handler: Port writing.
+//
+//
+void io_write( uint16_t address, uint8_t byte ) {
+    //
+    // Write the byte to the serial-port.
+    //
+    if ( address == 0 ) {
+        Serial.write( byte );
+        return;
+    }
+
+    //
+    // Unknown address
+    //
+}
+//
+//////////////////////////////////////////////////////////////////////
+
 
 // -----------------------------------------------------------
 // Main loop routine runs over and over again forever
 // -----------------------------------------------------------
 void loop() {
     //--------------------------------------------------------
-    // Clock goes high
-    //--------------------------------------------------------
-    delayMicroseconds( 4 );
-    digitalWrite( CLK, HIGH );
-    delayMicroseconds( 4 );
-
-    clkCountHi = 1;
-    clkCount++;
-    T++;
-    tracePauseCount++;
-    ReadControlState();
-    GetAddressFromAB();
-    if ( Mlast == 1 && m1 == 0 )
-        T = 1, m1Count++;
-    Mlast = m1;
-    bool suppressDump = false;
-    if ( !traceRefresh & !rfsh )
-        suppressDump = true;
-
-    // If the number of M1 cycles has been reached, skip the rest since we dont
-    // want to execute this M1 phase
-    if ( stopAtM1 >= 0 && m1Count > stopAtM1 ) {
-        sprintf( extraInfo, "%d M1 cycles reached", stopAtM1 ), running = false;
-        pf( F( "--------------------------------------------------------------+\r\n" ) );
-        goto control;
-    }
-
-    // If the address is tri-stated, skip checking various combinations of
-    // control signals since they may also be floating and we can't detect that
-    if ( !abTristated ) {
-        // Simulate read from RAM
-        if ( !mreq && !rd ) {
-            SetDataToDB( ram[ ab & ramMask ] );
-            if ( !m1 )
-                sprintf( extraInfo, "Opcode read from %04X -> %02X", ab, ram[ ab & ramMask ] );
-            else
-                sprintf( extraInfo, "Memory read from %04X -> %02X", ab, ram[ ab & ramMask ] );
-        } else
-            // Simulate interrupt requesting a vector
-            if ( !m1 && !iorq ) {
-                SetDataToDB( iorqVector );
-                sprintf( extraInfo, "Pushing vector %02X", iorqVector );
-            } else
-                GetDataFromDB();
-
-        // Simulate write to RAM
-        if ( !mreq && !wr ) {
-            ram[ ab & ramMask ] = db;
-            sprintf( extraInfo, "Memory write to  %04X <- %02X", ab, db );
-        }
-
-        // Simulate I/O read
-        if ( !iorq && !rd ) {
-            SetDataToDB( io[ ab & ioMask ] );
-            sprintf( extraInfo, "I/O read from %04X -> %02X", ab, io[ ab & ioMask ] );
-        }
-
-        // Simulate I/O write
-        if ( !iorq && !wr ) {
-            io[ ab & ioMask ] = db;
-            sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-        }
-
-        // Capture memory refresh cycle
-        if ( !mreq && !rfsh ) {
-            sprintf( extraInfo, "Refresh address  %04X", ab );
-        }
-    } else
-        GetDataFromDB();
-
-    DumpState( suppressDump );
-
-    // If the user wanted to pause simulation after a certain number of
-    // clocks, handle it here. If the key pressed to continue was not Enter,
-    // stop the simulation to issue that command
-    if ( tracePause == tracePauseCount ) {
-        while ( Serial.available() == 0 )
-            ;
-        if ( Serial.peek() != '\r' )
-            sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
-        else
-            Serial.read();
-        tracePauseCount = 0;
-    }
-
-    //--------------------------------------------------------
-    // Clock goes low
-    //--------------------------------------------------------
-    delayMicroseconds( 4 );
-    digitalWrite( CLK, LOW );
-    delayMicroseconds( 4 );
-
-    clkCountHi = 0;
-    if ( traceShowBothPhases ) {
-        ReadControlState();
-        GetAddressFromAB();
-        DumpState( suppressDump );
-    }
-
-    // Perform various actions at the requested clock number
-    // if the count is positive (we start it at -2 to skip initial 2T)
-    if ( clkCount >= 0 ) {
-        if ( clkCount == intAtClk )
-            zint = 0;
-        if ( clkCount == nmiAtClk )
-            nmi = 0;
-        if ( clkCount == busrqAtClk )
-            busrq = 0;
-        if ( clkCount == resetAtClk )
-            reset = 0;
-        if ( clkCount == waitAtClk )
-            wait = 0;
-        // De-assert all control pins at this clock number
-        if ( clkCount == clearAtClk )
-            zint = nmi = busrq = reset = wait = 1;
-        WriteControlPins();
-
-        // Stop the simulation under some conditions
-        if ( clkCount == stopAtClk )
-            sprintf( extraInfo, "%d clocks reached", clkCount ), running = false;
-        if ( stopAtHalt & !halt )
-            sprintf( extraInfo, "HALT instruction" ), running = false;
-    }
-
-    //--------------------------------------------------------
     // Trace/simulation control handler
     //--------------------------------------------------------
-control:
     if ( !running ) {
         pf( F( "--------------------------------------------------------------+\r\n" ) );
         pf( F( ":Simulation stopped: %s\r\n" ), extraInfo );
@@ -451,15 +485,25 @@ control:
             if ( Serial.available() > 0 ) {
                 unsigned adr = 0;
                 unsigned end = 0;
+                ramBegin = 0;
+                ramEnd = ramBegin + sizeof( ram ) - 1;
 
-                memset( temp, 0, TEMP_SIZE );
-                if ( !readBytesUntilEOL( temp, TEMP_SIZE - 1 ) )
+                memset( input, 0, INPUT_SIZE );
+                if ( !readBytesUntilEOL( input, INPUT_SIZE - 1 ) )
                     continue;
 
-                if ( temp[ 0 ] == 'e' ) {
-                    if ( temp[ 1 ] == '0' )
+                if ( input[ 0 ] == 'B' ) {
+                    ramBegin = 0x2000;
+                    ramEnd = ramBegin + sizeof( ram ) - 1;
+                    runBasic = input[ 1 ] != '?';
+                    DoReset();
+                    running = true;
+                }
+
+                if ( input[ 0 ] == 'e' ) {
+                    if ( input[ 1 ] == '0' )
                         doEcho = false;
-                    else if ( temp[ 1 ] == '1' )
+                    else if ( input[ 1 ] == '1' )
                         doEcho = true;
                     else
                         continue;
@@ -467,31 +511,34 @@ control:
                     continue;
                 }
 
-                if ( temp[ 0 ] == 'v' ) {
-                    if ( isdigit( temp[ 1 ] ) )
-                        verboseMode = temp[ 1 ] - '0';
+                if ( input[ 0 ] == 'v' ) {
+                    if ( isdigit( input[ 1 ] ) )
+                        verboseMode = input[ 1 ] - '0';
                     continue;
                 }
 
                 // Option ":"  : this is not really a user option.
                 // This is used to input Intel HEX format values into the RAM buffer
                 // Multiple lines may be pasted. They are separated by a space character.
-                char *pTemp = temp;
+                char *pTemp = input;
                 while ( *pTemp == ':' || *pTemp == '.' ) {
                     bool isRam = *pTemp == ':';
                     byte bytes = hex( ++pTemp ); // skip ':', start with hex number
                     if ( bytes > 0 ) {
                         adr = ( hex( pTemp + 2 ) << 8 ) + hex( pTemp + 4 );
                         // byte recordType = hex( pTemp + 6 );
-                        if ( verboseMode ) pf( F( "%04X:" ), adr );
+                        if ( verboseMode )
+                            pf( F( "%04X:" ), adr );
                         for ( int i = 0; i < bytes; i++ ) {
                             if ( isRam )
                                 ram[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
                             else
                                 io[ ( adr + i ) & ioMask ] = hex( pTemp + 8 + 2 * i );
-                            if ( verboseMode ) pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
+                            if ( verboseMode )
+                                pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
                         }
-                        if ( verboseMode ) pf( F( "\r\n" ) );
+                        if ( verboseMode )
+                            pf( F( "\r\n" ) );
                     }
                     pTemp += 2 * bytes + 10; // Skip to the next possible line of hex entry
                     while ( *pTemp && isspace( *pTemp ) )
@@ -499,7 +546,7 @@ control:
                 }
 
                 // Option "r"  : reset and run the simulation
-                if ( temp[ 0 ] == 'r' ) {
+                if ( input[ 0 ] == 'r' ) {
                     // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
                     // If the variable was set, skip reset sequence since we might be testing it.
                     if ( resetAtClk < 0 )
@@ -508,19 +555,19 @@ control:
                 }
 
                 // Option "sR" : reset simulation variables to their default values
-                if ( temp[ 0 ] == 's' && temp[ 1 ] == 'R' ) {
+                if ( input[ 0 ] == 's' && input[ 1 ] == 'R' ) {
                     ResetSimulationVars();
-                    temp[ 1 ] = 0; // Proceed to dump all variables...
+                    input[ 1 ] = 0; // Proceed to dump all variables...
                 }
 
                 // Option "s"  : show and set internal control variables
-                if ( temp[ 0 ] == 's' ) {
+                if ( input[ 0 ] == 's' ) {
                     // Show or set the simulation parameters
                     int var = 0, value;
-                    int args = sscanf( &temp[ 1 ], "%d %d", &var, &value );
+                    int args = sscanf( &input[ 1 ], "%d %d", &var, &value );
                     // Parameter for the option #12 is read in as a hex; others are decimal by default
                     if ( var == 12 )
-                        args = sscanf( &temp[ 1 ], "%d %x", &var, &value );
+                        args = sscanf( &input[ 1 ], "%d %x", &var, &value );
                     if ( args == 2 ) {
                         if ( var == 0 )
                             traceShowBothPhases = value;
@@ -567,24 +614,24 @@ control:
                     pf( F( "#12 Push IORQ vector #(hex)  = %02X\r\n" ), iorqVector );
                 }
 
-                if ( temp[ 0 ] == 'm' && temp[ 1 ] == 'R' ) {
+                if ( input[ 0 ] == 'm' && input[ 1 ] == 'R' ) {
                     // Option "mR"  : reset RAM memory
-                    memset( ram, 0, sizeof( ram ) );
+                    memset( ram, 0, ramLen );
                     pf( F( "RAM reset to 00\r\n" ) );
-                } else if ( temp[ 0 ] == 'i' && temp[ 1 ] == 'R' ) {
+                } else if ( input[ 0 ] == 'i' && input[ 1 ] == 'R' ) {
                     // Option "iR"  : reset IO memory
-                    memset( io, 0, sizeof( io ) );
+                    memset( io, 0, ioLen );
                     pf( F( "IO reset to 00\r\n" ) );
-                } else if ( ( temp[0] == 'm' || temp[ 0 ] == 'i' ) && temp[1] == 's' ) {
+                } else if ( ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) && input[ 1 ] == 's' ) {
                     // Option "ms"  : set RAM memory from ADR to byte(s) B
                     // Option "is"  : set IO memory from ADR to byte(s) B
                     // ms/is ADR B B B ...
-                    bool isRam = temp[ 0 ] == 'm';
+                    bool isRam = input[ 0 ] == 'm';
                     int i = 2;
-                    if ( !isxdigit( temp[2] ) )
-                        i = nextHex( temp, 0 ); // skip to start of adr
+                    if ( !isxdigit( input[ 2 ] ) )
+                        i = nextHex( input, 0 ); // skip to start of adr
                     unsigned val;
-                    if ( i &&  sscanf( pTemp + i, "%04X ", &adr ) == 1 ) {
+                    if ( i && sscanf( pTemp + i, "%04X ", &adr ) == 1 ) {
                         end = adr;
                         while ( ( i = nextHex( pTemp, i ) ) ) {
                             if ( end >= ( isRam ? ramLen : ioLen ) )
@@ -597,31 +644,31 @@ control:
                             } else
                                 break;
                         }
-                        pTemp[1] = 0; // "fall through" to mem/io dump
+                        pTemp[ 1 ] = 0; // "fall through" to mem/io dump
                     }
                 }
 
-                if ( temp[ 0 ] == 'm' || temp[ 0 ] == 'i' ) {
+                if ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) {
                     // Option "m START END"  : dump RAM memory
                     // Option "i START END"  : dump IO memory
                     // START and END are optional
                     // START defaults to 0 or ADR from "ms adr ..."
                     // END defaults to START + 0x100
                     // Option "mx" : same in intel hex format
-                    bool isRam = temp[ 0 ] == 'm';
+                    bool isRam = input[ 0 ] == 'm';
                     bool isHex = false;
                     int i = 1, rc = 0;
-                    if ( temp[1] == 'x' ) {
+                    if ( input[ 1 ] == 'x' ) {
                         isHex = true;
                         i = 2;
                     }
-                    if ( !isxdigit( temp[i] ) )
-                        i = nextHex( temp, 0 ); // skip to start of adr
+                    if ( !isxdigit( input[ i ] ) )
+                        i = nextHex( input, 0 ); // skip to start of adr
                     if ( i )
-                        rc = sscanf( temp + i, "%04X", &adr );
-                    adr &= 0xFF0; // fit to line
-                    if ( !end && rc && ( i = nextHex( temp, i ) ) ) // one more argument
-                        rc = sscanf( temp + i, "%04X", &end );
+                        rc = sscanf( input + i, "%04X", &adr );
+                    adr &= 0xFF0;                                    // fit to line
+                    if ( !end && rc && ( i = nextHex( input, i ) ) ) // one more argument
+                        rc = sscanf( input + i, "%04X", &end );
                     if ( isRam ) {
                         if ( !end )
                             end = adr + 0x100;
@@ -639,15 +686,15 @@ control:
                                 pf( F( ".10%04X00" ), aaa & ioMask );
                             unsigned char cs = 0;
                             cs -= 0x10; // datalen
-                            cs -= (aaa) & 0xFF;
-                            cs -= (aaa >> 8) & 0x0F;
+                            cs -= (aaa)&0xFF;
+                            cs -= ( aaa >> 8 ) & 0x0F;
                             for ( int j = 0; j < 0x10; j++ ) {
                                 unsigned char val;
                                 if ( isRam )
                                     val = ram[ ( aaa + j ) & ramMask ];
                                 else
                                     val = io[ ( aaa + j ) & ioMask ];
-                                pf( "%02X",  val );
+                                pf( "%02X", val );
                                 cs -= val;
                             }
                             pf( "%02X\r\n", cs );
@@ -657,8 +704,7 @@ control:
                         else
                             pf( F( ".00000001FF\r\n" ) );
                     } else { // normal dump, RAM or IO
-                        pf( F( " %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ),
-                               isRam ? "MEM" : " IO" );
+                        pf( F( " %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ), isRam ? "MEM" : " IO" );
                         pf( F( "--------------------------------------------------------+\r\n" ) );
                         for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
                             if ( isRam )
@@ -680,7 +726,9 @@ control:
                 }
 
                 // Option "?"  : print help
-                if ( temp[ 0 ] == '?' || temp[ 0 ] == 'h' ) {
+                if ( input[ 0 ] == '?' || input[ 0 ] == 'h' ) {
+                    pf( F( "B               - execute Basic interpreter\r\n" ) );
+                    pf( F( "B?              - analyse Basic interpreter\r\n" ) );
                     pf( F( "e0              - set echo off (default)\r\n" ) );
                     pf( F( "e1              - set echo on\r\n" ) );
                     pf( F( "s               - show simulation variables\r\n" ) );
@@ -700,18 +748,171 @@ control:
                     pf( F( "vN              - set verboseMode to N (default = 0)\r\n" ) );
                 }
             }
+        } // while ( !running )
+    }     // if ( !runing )
+
+    if ( runBasic ) {
+        //
+        // Do we have any pending serial-input?  If so
+        // trigger an interrupt to the processor.
+        //
+        // (Active is "low".)
+        //
+        if ( Serial.available() )
+            digitalWrite( INT, LOW );
+        //
+        // Tickle the CPU.
+        //
+        cpu.Tick();
+
+    } else { // analyse RAM or ROM
+
+        //--------------------------------------------------------
+        // Clock goes high
+        //--------------------------------------------------------
+        delayMicroseconds( 4 );
+        digitalWrite( CLK, HIGH );
+        delayMicroseconds( 4 );
+
+        clkCountHi = 1;
+        clkCount++;
+        T++;
+        tracePauseCount++;
+        ReadControlState();
+        GetAddressFromAB();
+        if ( m1Prev == 1 && m1 == 0 )
+            T = 1, m1Count++;
+        m1Prev = m1;
+        bool suppressDump = false;
+        if ( !traceRefresh & !rfsh )
+            suppressDump = true;
+
+        // If the number of M1 cycles has been reached, skip the rest since we dont
+        // want to execute this M1 phase
+        if ( stopAtM1 >= 0 && m1Count > stopAtM1 ) {
+            sprintf( extraInfo, "%d M1 cycles reached", stopAtM1 ), running = false;
+            pf( F( "--------------------------------------------------------------+\r\n" ) );
+            goto nextLoop;
         }
-    }
-}
+
+        // If the address is tri-stated, skip checking various combinations of
+        // control signals since they may also be floating and we can't detect that
+        if ( !abTristated ) {
+            uint8_t data = 0;
+            // Simulate read from RAM
+            if ( !mreq && !rd ) {
+                if ( ab < ramBegin )
+                    data = pgm_read_byte_near( rom + ab );
+                else if ( ab <= ramEnd )
+                    data = ram[ ab - ramBegin ];
+                SetDataToDB( data );
+                if ( !m1 )
+                    sprintf( extraInfo, "Opcode read from %04X -> %02X", ab, data );
+                else
+                    sprintf( extraInfo, "Memory read from %04X -> %02X", ab, data );
+            }
+
+            // Simulate interrupt requesting a vector
+            else if ( !m1 && !iorq ) {
+                SetDataToDB( iorqVector );
+                sprintf( extraInfo, "Pushing vector %02X", iorqVector );
+            }
+
+            // Simulate write to RAM
+            else if ( !mreq && !wr ) {
+                if ( ( ab >= ramBegin ) && ( ab <= ramEnd ) )
+                    ram[ ab - ramBegin ] = db;
+                sprintf( extraInfo, "Memory write to  %04X <- %02X", ab, db );
+            }
+
+            // Simulate I/O read
+            else if ( !iorq && !rd ) {
+                data = io[ ab & ioMask ];
+                SetDataToDB( data );
+                sprintf( extraInfo, "I/O read from %04X -> %02X", ab, data );
+            }
+
+            // Simulate I/O write
+            else if ( !iorq && !wr ) {
+                io[ ab & ioMask ] = db;
+                sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
+            }
+
+            // Capture memory refresh cycle
+            else if ( !mreq && !rfsh ) {
+                sprintf( extraInfo, "Refresh address  %04X", ab );
+            }
+
+            else
+                GetDataFromDB();
+        } else
+            GetDataFromDB();
+
+        DumpState( suppressDump );
+
+        // If the user wanted to pause simulation after a certain number of
+        // clocks, handle it here. If the key pressed to continue was not Enter,
+        // stop the simulation to issue that command
+        if ( tracePause == tracePauseCount ) {
+            while ( Serial.available() == 0 )
+                ;
+            if ( Serial.peek() != '\r' )
+                sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
+            else
+                Serial.read();
+            tracePauseCount = 0;
+        }
+
+        //--------------------------------------------------------
+        // Clock goes low
+        //--------------------------------------------------------
+        // delayMicroseconds( 4 );
+        digitalWrite( CLK, LOW );
+        // delayMicroseconds( 4 );
+
+        clkCountHi = 0;
+        if ( traceShowBothPhases ) {
+            ReadControlState();
+            GetAddressFromAB();
+            DumpState( suppressDump );
+        }
+
+        // Perform various actions at the requested clock number
+        // if the count is positive (we start it at -2 to skip initial 2T)
+        if ( clkCount >= 0 ) {
+            if ( clkCount == intAtClk )
+                zint = 0;
+            if ( clkCount == nmiAtClk )
+                nmi = 0;
+            if ( clkCount == busrqAtClk )
+                busrq = 0;
+            if ( clkCount == resetAtClk )
+                reset = 0;
+            if ( clkCount == waitAtClk )
+                wait = 0;
+            // De-assert all control pins at this clock number
+            if ( clkCount == clearAtClk )
+                zint = nmi = busrq = reset = wait = 1;
+            WriteControlPins();
+
+            // Stop the simulation under some conditions
+            if ( clkCount == stopAtClk )
+                sprintf( extraInfo, "%d clocks reached", clkCount ), running = false;
+            if ( stopAtHalt & !halt )
+                sprintf( extraInfo, "HALT instruction" ), running = false;
+        }
+    nextLoop:;
+    } // else ( !runBasic )
+} // loop()
 
 
 // Utility function to provide a meaningful printf to a serial port
 // Function for fmt string in ram
 void pf( const char *fmt, ... ) {
-    char tmp[ 256 ]; // resulting string limited to 256 chars
+    // char tmp[ 256 ]; // resulting string limited to 256 chars
     va_list args;
     va_start( args, fmt );
-    vsnprintf( tmp, 256, fmt, args );
+    vsnprintf( tmp, tmpLen, fmt, args );
     va_end( args );
     Serial.print( tmp );
 }
@@ -721,13 +922,13 @@ void pf( const char *fmt, ... ) {
 // Overloaded function for fmt string in flash
 void pf( const __FlashStringHelper *fmt, ... ) {
     // move string from flash to ram
-    char f[ 256 ];
-    memset( f, 0, 256 );
-    strlcpy_P( f, (const char PROGMEM *)fmt, 256 );
-    char tmp[ 256 ]; // resulting string limited to 256 chars
+    // char ftmp[ 256 ];
+    memset( ftmp, 0, ftmpLen );
+    strlcpy_P( ftmp, (const char PROGMEM *)fmt, 256 );
+    // char tmp[ 256 ]; // resulting string limited to 256 chars
     va_list args;
-    va_start( args, fmt ); // get args from input
-    vsnprintf( tmp, 256, f, args ); // use format string in ram
+    va_start( args, fmt );                // get args from input
+    vsnprintf( tmp, tmpLen, ftmp, args ); // use format string in ram
     va_end( args );
     Serial.print( tmp );
 }
@@ -747,16 +948,16 @@ byte hex( char *s ) {
 
 // return index of next hex number in string s starting from index i
 static int nextHex( char *s, int i ) {
-    while ( s[i] && s[i] != ' ' )
+    while ( s[ i ] && s[ i ] != ' ' )
         ++i;
-    while ( s[i] && s[i] == ' ' )
+    while ( s[ i ] && s[ i ] == ' ' )
         ++i;
-    return( isxdigit( s[i] ) ? i : 0 );
+    return ( isxdigit( s[ i ] ) ? i : 0 );
 }
 
 
 int readBytesUntilEOL( char *buf, int maxlen ) {
-    int c, n=0;
+    int c, n = 0;
     while ( maxlen ) {
         c = Serial.read();
         if ( c == -1 )
@@ -774,127 +975,3 @@ int readBytesUntilEOL( char *buf, int maxlen ) {
     *buf = 0;
     return n;
 }
-
-
-// --- ATTIC ---
-
-#if 0
-
-// Define Arduino Mega pins that are connected to a Z80 dongle board.
-
-// Address bus pins from Z80 are connected to PA (A0..A7) and PC (A8..A15) on Arduino.
-// #define AB0 22 // AB low is PA
-// #define AB1 23
-// #define AB2 24
-// #define AB3 25
-// #define AB4 26
-// #define AB5 27
-// #define AB6 28
-// #define AB7 29
-//
-// #define AB8 37 // AB high is PC
-// #define AB9 36
-// #define AB10 35
-// #define AB11 34
-// #define AB12 33
-// #define AB13 32
-// #define AB14 31
-// #define AB15 30
-
-// Data bus pins from Z80 are connected to PL (D0..D7) on Arduino
-// #define DB0 49 // DB is PL
-// #define DB1 48
-// #define DB2 47
-// #define DB3 46
-// #define DB4 45
-// #define DB5 44
-// #define DB6 43
-// #define DB7 42
-
-
-// Set new data value into the Z80 data bus
-void SetDataToDB_( byte data ) {
-    pinMode( DB0, OUTPUT );
-    pinMode( DB1, OUTPUT );
-    pinMode( DB2, OUTPUT );
-    pinMode( DB3, OUTPUT );
-    pinMode( DB4, OUTPUT );
-    pinMode( DB5, OUTPUT );
-    pinMode( DB6, OUTPUT );
-    pinMode( DB7, OUTPUT );
-
-    digitalWrite( DB0, ( data & ( 1 << 0 ) ) ? HIGH : LOW );
-    digitalWrite( DB1, ( data & ( 1 << 1 ) ) ? HIGH : LOW );
-    digitalWrite( DB2, ( data & ( 1 << 2 ) ) ? HIGH : LOW );
-    digitalWrite( DB3, ( data & ( 1 << 3 ) ) ? HIGH : LOW );
-    digitalWrite( DB4, ( data & ( 1 << 4 ) ) ? HIGH : LOW );
-    digitalWrite( DB5, ( data & ( 1 << 5 ) ) ? HIGH : LOW );
-    digitalWrite( DB6, ( data & ( 1 << 6 ) ) ? HIGH : LOW );
-    digitalWrite( DB7, ( data & ( 1 << 7 ) ) ? HIGH : LOW );
-    db = data;
-    dbTristated = false;
-}
-
-// Read Z80 data bus (PINL) and store into db variable
-void GetDataFromDB_() {
-    pinMode( DB0, INPUT );
-    pinMode( DB1, INPUT );
-    pinMode( DB2, INPUT );
-    pinMode( DB3, INPUT );
-    pinMode( DB4, INPUT );
-    pinMode( DB5, INPUT );
-    pinMode( DB6, INPUT );
-    pinMode( DB7, INPUT );
-
-    digitalWrite( DB0, LOW );
-    digitalWrite( DB1, LOW );
-    digitalWrite( DB2, LOW );
-    digitalWrite( DB3, LOW );
-    digitalWrite( DB4, LOW );
-    digitalWrite( DB5, LOW );
-    digitalWrite( DB6, LOW );
-    digitalWrite( DB7, LOW );
-
-    // Detect if the data bus is tri-stated
-    delayMicroseconds( 4 );
-    int sense = analogRead( DB0_sense );
-    if ( verboseMode )
-        pf( F( "DB0 sense: %4d\n" ), sense );
-    // These numbers might need to be adjusted for each Arduino board
-    dbTristated = sense > HI_Z_LOW && sense < HI_Z_HIGH;
-
-    byte d0 = digitalRead( DB0 );
-    byte d1 = digitalRead( DB1 );
-    byte d2 = digitalRead( DB2 );
-    byte d3 = digitalRead( DB3 );
-    byte d4 = digitalRead( DB4 );
-    byte d5 = digitalRead( DB5 );
-    byte d6 = digitalRead( DB6 );
-    byte d7 = digitalRead( DB7 );
-    db = ( d7 << 7 ) | ( d6 << 6 ) | ( d5 << 5 ) | ( d4 << 4 ) | ( d3 << 3 ) | ( d2 << 2 ) | ( d1 << 1 ) | d0;
-}
-
-// Read a value of Z80 address bus and store it into the ab variable.
-// In addition, try to detect when a bus is tri-stated and write 0xFFF if so.
-void GetAddressFromAB_() {
-    // Detect if the address bus is tri-stated
-    int sense = analogRead( AB0_sense );
-    if ( verboseMode )
-    // These numbers might need to be adjusted for each Arduino board
-    abTristated = sense > HI_Z_LOW && sense < HI_Z_HIGH;
-
-    int a0 = digitalRead( AB0 );
-    int a1 = digitalRead( AB1 );
-    int a2 = digitalRead( AB2 );
-    int a3 = digitalRead( AB3 );
-    int a4 = digitalRead( AB4 );
-    int a5 = digitalRead( AB5 );
-    int a6 = digitalRead( AB6 );
-    int a7 = digitalRead( AB7 );
-    ab = ( a7 << 7 ) | ( a6 << 6 ) | ( a5 << 5 ) | ( a4 << 4 ) | ( a3 << 3 ) | ( a2 << 2 ) | ( a1 << 1 ) | a0;
-
-    if ( verboseMode )
-        pf( F( "AB0 sense: %4d, Address bus: %04X\n" ), sense, ab );
-}
-
-#endif

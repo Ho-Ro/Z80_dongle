@@ -1,5 +1,7 @@
 # Arduino and ZiLOG Z80
 
+![Z80 dongle](Z80_dongle.jpg)
+
 The idea and the software is taken from [Goran Devic](https://baltazarstudios.com/arduino-zilog-z80/).
 
 If you want to find out exactly what a venerable Z80 is doing on its bus
@@ -22,9 +24,10 @@ You can use anything: I use a 2.2uF tantalum cap. The evil thing with not
 putting bypass (or decoupling) caps in your designs is that you may never find out
 why they might behave erratically.
 
-There is also a push button, which is optional. In contrast to Goran's *sketch* above
-it is connected to the /RESET pin of the Z80 CPU.
+There is also a push button next to the CPU socket, which is optional.
+In contrast to Goran's *sketch* above it is connected to the /RESET pin of the Z80 CPU.
 A Schottky diode decouples this reset button from the Arduino output.
+Another push button at the lower edge of the proto board resets the Arduino Mega.
 
 Now, the most interesting extension to the design is a tri-state bus detection.
 
@@ -47,7 +50,7 @@ clock, which goes to pin 10 on Arduino which is a PWM output that allows to cloc
 also +5V and GND.
 
 I got the Mega proto board, the Textool (clone) socket and some Z80 CPUs from Hein Pragt's
-retro electronics part [webshop](https://www.heinpragt.nl/). Hein uses a similar
+[retro electronics part webshop](https://www.heinpragt.nl/). Hein uses a similar
 [Z80 / Arduino setup](https://www.heinpragt-software.com/z80-on-arduimo-mega/)
 to run Z80 programs using the Arduino Mega as ROM, RAM, and IO interface.
 I use the same connections for my Z80 dongle as Hein, so his SW (e.g. a Basic interpreter)
@@ -56,9 +59,7 @@ runs also on this dongle.
 ## Firmware
 
 The Mega firmware is taken from Goran, I adapted it to my changed connections and added
-commands for memory modification and memory dump.
-
-The Arduino communicates via the USB serial connection to the PC with 115200 bps,
+commands for memory modification and memory dump. The Arduino communicates via the USB serial connection to the PC with 115200 bps,
 you can use either the serial monitor of the Arduino IDE or any serial terminal program.
 I use e.g. minicom on Linux.
 
@@ -66,6 +67,8 @@ Connected through a serial port, you have several commands available (type `?` o
 at the console):
 
 ```
+B               - execute Basic interpreter
+B?              - analyse Basic interpreter
 e0              - set echo off (default)
 e1              - set echo on
 s               - show simulation variables
@@ -89,6 +92,7 @@ There are several internal simulation variables that you can change in order to 
 on Z80 in various ways. The best way is to create a small test program.
 I use the `z80assembler` from the [sarnau/Z80DisAssembler](https://github.com/sarnau/Z80DisAssembler)
 package.
+
 
 ## Analysing the Z80
 
@@ -855,4 +859,31 @@ And run it. Show the IO space with `i 0 10`:
 - Address 0: 00=NMOS, FF=CMOS
 - Address 1: 00=NEC, 28=Zilog (and compatible)
 - Address 2: 80=Z80, 88=U880
+
+## Nascom ROM Basic
+
+My 1st computer back in 1980 was a [Nascom 2 kit](https://en.wikipedia.org/wiki/Nascom) with
+16K dynamic RAM and 8K Basic in ROM, so I wanted to include the Basic interpreter from the
+[Z80 retroshield project](https://github.com/skx/z80retroshield/tree/master/examples/basic).
+
+```
+Z80 SBC By Grant Searle
+
+Memory top?
+Z80 BASIC Ver 4.7b
+Copyright (C) 1978 by Microsoft
+6270 Bytes free
+Ok
+```
+
+The SW is based on the Nascom Rom Basic:
+
+```
+; NASCOM ROM BASIC Ver 4.7, (C) 1978 Microsoft
+; Scanned from source published in 80-BUS NEWS from Vol 2, Issue 3
+; (May-June 1983) to Vol 3, Issue 3 (May-June 1984)
+```
+
+and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
+The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
 
