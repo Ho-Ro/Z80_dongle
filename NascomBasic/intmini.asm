@@ -26,7 +26,7 @@ serInPtr        .EQU    serBuf+SER_BUFSIZE
 serRdPtr        .EQU    serInPtr+2
 serBufUsed      .EQU    serRdPtr+2
 basicStarted    .EQU    serBufUsed+1
-TEMPSTACK       .EQU    020EDH ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+TEMPSTACK       .EQU    020EDH          ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
 CR              .EQU    0DH
 LF              .EQU    0AH
@@ -36,10 +36,10 @@ CS              .EQU    0CH             ; Clear screen
 ;------------------------------------------------------------------------------
 ; Reset
 
-RST00           DI                       ;Disable interrupts
+RST00           DI                      ;Disable interrupts
                 JP      INIT            ;Initialize Hardware and go
 
-                .FILL   0008H-$,0 ; Padding so RST8 starts at org 0x0008H
+                .FILL   0008H-$,0       ; Padding so RST8 starts at org 0x0008H
 
 ;------------------------------------------------------------------------------
 ; TX a character over RS232
@@ -47,7 +47,7 @@ RST00           DI                       ;Disable interrupts
                 .ORG    0008H
 RST08           JP      TXA
 
-                .FILL   0010H-$,0 ; Padding so RST10 starts at org 0x0010H
+                .FILL   0010H-$,0       ; Padding so RST10 starts at org 0x0010H
 
 ;------------------------------------------------------------------------------
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
@@ -74,7 +74,7 @@ RST38           JR      serialInt
 ;------------------------------------------------------------------------------
 serialInt:      PUSH    AF
                 PUSH    HL
-                IN      A,(00h)   ;RECEIVE CHAR
+                IN      A,(00h)         ; RECEIVE CHAR
 
                 PUSH    AF
                 LD      A,(serBufUsed)
@@ -125,7 +125,7 @@ rts1:
                 LD      A,(HL)
                 EI
                 POP     HL
-                RET                      ; Char ready in A
+                RET                     ; Char ready in A
 
 ;------------------------------------------------------------------------------
 TXA:            OUT     (00h),A

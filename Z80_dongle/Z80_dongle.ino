@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
 //------------------------------------------------------------------------
 // This Arduino sketch should be used with a Mega board connected to a
 // dongle hosting a Z80 CPU. The Arduino fully controls and senses all
@@ -24,8 +26,12 @@
 // The z80retroshield part of the SW is under the MIT License (MIT)
 // Copyright (c) 2019 Erturk Kocalar, http://8Bitforce.com/
 // Copyright (c) 2019 Steve Kemp, https://steve.kemp.fi/
-
-
+//
+// The updates to the original BASIC within this project are copyright Grant Searle:
+// ; You have permission to use this for NON COMMERCIAL USE ONLY
+// ; If you wish to use it elsewhere, please include an acknowledgement to myself (G.S.).
+//
+// My derived work is copyright 2024 M.Ho-Ro and provided under GPL v.3
 //------------------------------------------------------------------------
 
 #include <stdarg.h>
@@ -133,6 +139,7 @@ int resetAtClk;          // Issue RESET signal at that clock number
 int waitAtClk;           // Issue WAIT signal at that clock number
 int clearAtClk;          // Clear all control signals at that clock number
 byte iorqVector;         // Push IORQ vector (default is FF)
+uint16_t pauseAddress;   // Pause at M1
 
 // Buffer containing RAM memory for Z80 to access
 const uint16_t ramLen = 0x1000;
@@ -166,11 +173,11 @@ const unsigned int ftmpLen = 256;
 char *tmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen;
 char *ftmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
 
-int doEcho = 0;      // Echo received commands
+int doEcho = 1;      // Echo received commands
 int verboseMode = 0; // Enable debugging output
 
 bool runBasic = false;
-
+bool analyseBasic = false;
 //
 // Our helper
 //
@@ -181,7 +188,7 @@ Z80RetroShield cpu;
 // Arduino initialization entry point
 // -----------------------------------------------------------
 void setup() {
-    Serial.begin( 115200 );
+    Serial.begin( 1000000 );
     Serial.flush();
     Serial.setTimeout( 1000L * 60 * 60 );
 
@@ -252,8 +259,8 @@ void setup() {
 void ResetSimulationVars() {
     traceShowBothPhases = 0; // Show both phases of a clock cycle
     traceRefresh = 1;        // Trace refresh cycles
-    tracePause = 0;          // Pause for a keypress every so many clocks
-    stopAtClk = 40;          // Stop the simulation after this many clocks
+    tracePause = 100;          // Pause for a keypress every so many clocks
+    stopAtClk = -1;          // Stop the simulation after this many clocks
     stopAtM1 = -1;           // Stop at a specific M1 cycle number
     stopAtHalt = 1;          // Stop when HALT signal gets active
     intAtClk = -1;           // Issue INT signal at that clock number
@@ -263,6 +270,7 @@ void ResetSimulationVars() {
     waitAtClk = -1;          // Issue WAIT signal at that clock number
     clearAtClk = -1;         // Clear all control signals at that clock number
     iorqVector = 0xFF;       // Push IORQ vector
+    pauseAddress = 0;        // Pause at M1 at this address
     verboseMode = 0;         // Enable debugging output
 }
 
@@ -286,7 +294,7 @@ void DoReset() {
     clkCount = -2;
     T = 0;
     m1Prev = 1;
-    tracePauseCount = 0;
+    tracePauseCount = -2;
     m1Count = 0;
 }
 
@@ -364,8 +372,8 @@ void DumpState( bool suppress ) {
         if ( !dbTristated )
             sprintf( dbStr, "%02X", db );
         if ( T == 1 && clkCountHi )
-            pf( F( "--------------------------------------------------------------+\r\n" ) );
-        pf( F( "#%03d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s %s\r\n" ), clkCount < 0 ? 0 : clkCount,
+            pf( F( "+-----------------------------------------------------------------+\r\n" ) );
+        pf( F( "| #%05d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s %s\r\n" ), clkCount < 0 ? 0 : clkCount,
             clkCountHi ? 'H' : 'L', T, abStr, dbStr, m1 ? "  " : "M1", rfsh ? "    " : "RFSH", mreq ? "    " : "MREQ",
             rd ? "  " : "RD", wr ? "  " : "WR", iorq ? "    " : "IORQ", busak ? "     " : "BUSAK", halt ? "    " : "HALT",
             zint ? "" : "[INT]", nmi ? "" : "[NMI]", busrq ? "" : "[BUSRQ]", wait ? "" : "[WAIT]", extraInfo );
@@ -469,12 +477,13 @@ void io_write( uint16_t address, uint8_t byte ) {
 // Main loop routine runs over and over again forever
 // -----------------------------------------------------------
 void loop() {
+    uint16_t m1Address = 0;
     //--------------------------------------------------------
     // Trace/simulation control handler
     //--------------------------------------------------------
     if ( !running ) {
-        pf( F( "--------------------------------------------------------------+\r\n" ) );
-        pf( F( ":Simulation stopped: %s\r\n" ), extraInfo );
+        pf( F( "  ----------------------------------------------------------------+\r\n" ) );
+        pf( F( "  :Simulation stopped: %s\r\n" ), extraInfo );
         extraInfo[ 0 ] = 0;
         digitalWrite( CLK, HIGH );
         zint = nmi = busrq = wait = 1;
@@ -492,10 +501,13 @@ void loop() {
                 if ( !readBytesUntilEOL( input, INPUT_SIZE - 1 ) )
                     continue;
 
-                if ( input[ 0 ] == 'B' ) {
+                if ( input[ 0 ] == 'A' || input[ 0 ] == 'B' ) {
                     ramBegin = 0x2000;
                     ramEnd = ramBegin + sizeof( ram ) - 1;
-                    runBasic = input[ 1 ] != '?';
+                    if ( input[ 0 ] == 'A' )
+                        analyseBasic = true;
+                    else
+                        runBasic = true;
                     DoReset();
                     running = true;
                 }
@@ -566,7 +578,7 @@ void loop() {
                     int var = 0, value;
                     int args = sscanf( &input[ 1 ], "%d %d", &var, &value );
                     // Parameter for the option #12 is read in as a hex; others are decimal by default
-                    if ( var == 12 )
+                    if ( var == 12 || var == 13 )
                         args = sscanf( &input[ 1 ], "%d %x", &var, &value );
                     if ( args == 2 ) {
                         if ( var == 0 )
@@ -596,22 +608,23 @@ void loop() {
                         if ( var == 12 )
                             iorqVector = value & 0xFF;
                         if ( var == 13 )
-                            verboseMode = value;
+                            pauseAddress = value & 0xFFFF;
                     }
-                    pf( F( "------ Simulation variables ------\r\n" ) );
-                    pf( F( "#0  Trace both clock phases  = %2d\r\n" ), traceShowBothPhases );
-                    pf( F( "#1  Trace refresh cycles     = %2d\r\n" ), traceRefresh );
-                    pf( F( "#2  Pause for keypress every = %2d\r\n" ), tracePause );
-                    pf( F( "#3  Stop after clock #       = %2d\r\n" ), stopAtClk );
-                    pf( F( "#4  Stop after M1 cycle #    = %2d\r\n" ), stopAtM1 );
-                    pf( F( "#5  Stop at HALT             = %2d\r\n" ), stopAtHalt );
-                    pf( F( "#6  Issue INT at clock #     = %2d\r\n" ), intAtClk );
-                    pf( F( "#7  Issue NMI at clock #     = %2d\r\n" ), nmiAtClk );
-                    pf( F( "#8  Issue BUSRQ at clock #   = %2d\r\n" ), busrqAtClk );
-                    pf( F( "#9  Issue RESET at clock #   = %2d\r\n" ), resetAtClk );
-                    pf( F( "#10 Issue WAIT at clock #    = %2d\r\n" ), waitAtClk );
-                    pf( F( "#11 Clear all at clock #     = %2d\r\n" ), clearAtClk );
-                    pf( F( "#12 Push IORQ vector #(hex)  = %02X\r\n" ), iorqVector );
+                    pf( F( "  ------ Simulation variables --------\r\n" ) );
+                    pf( F( "  #0  Trace both clock phases  = %4d\r\n" ), traceShowBothPhases );
+                    pf( F( "  #1  Trace refresh cycles     = %4d\r\n" ), traceRefresh );
+                    pf( F( "  #2  Pause for keypress every = %4d\r\n" ), tracePause );
+                    pf( F( "  #3  Stop after clock #       = %4d\r\n" ), stopAtClk );
+                    pf( F( "  #4  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
+                    pf( F( "  #5  Stop at HALT             = %4d\r\n" ), stopAtHalt );
+                    pf( F( "  #6  Issue INT at clock #     = %4d\r\n" ), intAtClk );
+                    pf( F( "  #7  Issue NMI at clock #     = %4d\r\n" ), nmiAtClk );
+                    pf( F( "  #8  Issue BUSRQ at clock #   = %4d\r\n" ), busrqAtClk );
+                    pf( F( "  #9  Issue RESET at clock #   = %4d\r\n" ), resetAtClk );
+                    pf( F( "  #10 Issue WAIT at clock #    = %4d\r\n" ), waitAtClk );
+                    pf( F( "  #11 Clear all at clock #     = %4d\r\n" ), clearAtClk );
+                    pf( F( "  #12 Push IORQ vector #(hex)  =   %02X\r\n" ), iorqVector );
+                    pf( F( "  #13 Pause at M1 from #(hex)  = %04X\r\n" ), pauseAddress );
                 }
 
                 if ( input[ 0 ] == 'm' && input[ 1 ] == 'R' ) {
@@ -704,13 +717,13 @@ void loop() {
                         else
                             pf( F( ".00000001FF\r\n" ) );
                     } else { // normal dump, RAM or IO
-                        pf( F( " %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ), isRam ? "MEM" : " IO" );
-                        pf( F( "--------------------------------------------------------+\r\n" ) );
+                        pf( F( "   %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ), isRam ? "MEM" : " IO" );
+                        pf( F( "+---------------------------------------------------------+\r\n" ) );
                         for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
                             if ( isRam )
-                                pf( F( "%04X : " ), aaa & ramMask );
+                                pf( F( "| %04X : " ), aaa & ramMask );
                             else
-                                pf( F( "%04X : " ), aaa & ioMask );
+                                pf( F( "| %04X : " ), aaa & ioMask );
                             for ( int j = 0; j < 16; j++ ) {
                                 if ( isRam )
                                     pf( F( "%02X " ), ram[ ( aaa + j ) & ramMask ] );
@@ -721,31 +734,31 @@ void loop() {
                             }
                             pf( F( "|\r\n" ) );
                         }
-                        pf( F( "--------------------------------------------------------+\r\n" ) );
+                        pf( F( "+---------------------------------------------------------+\r\n" ) );
                     }
                 }
 
                 // Option "?"  : print help
                 if ( input[ 0 ] == '?' || input[ 0 ] == 'h' ) {
-                    pf( F( "B               - execute Basic interpreter\r\n" ) );
-                    pf( F( "B?              - analyse Basic interpreter\r\n" ) );
-                    pf( F( "e0              - set echo off (default)\r\n" ) );
-                    pf( F( "e1              - set echo on\r\n" ) );
-                    pf( F( "s               - show simulation variables\r\n" ) );
-                    pf( F( "s N VALUE       - set simulation variable number N to a VALUE\r\n" ) );
-                    pf( F( "sR              - reset simulation variables to their default values\r\n" ) );
-                    pf( F( "r               - restart the simulation\r\n" ) );
-                    pf( F( ":INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
-                    pf( F( ".INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
-                    pf( F( "m START END     - dump the RAM buffer from START to END\r\n" ) );
-                    pf( F( "mx START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
-                    pf( F( "mR              - reset the RAM buffer to 00\r\n" ) );
-                    pf( F( "ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
-                    pf( F( "i START END     - dump the IO buffer from START to END\r\n" ) );
-                    pf( F( "ix START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
-                    pf( F( "iR              - reset the IO buffer to 00\r\n" ) );
-                    pf( F( "is ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
-                    pf( F( "vN              - set verboseMode to N (default = 0)\r\n" ) );
+                    pf( F( "  A               - analyse ROM Basic interpreter\r\n" ) );
+                    pf( F( "  B               - execute ROM Basic interpreter\r\n" ) );
+                    pf( F( "  e0              - set echo off\r\n" ) );
+                    pf( F( "  e1              - set echo on (default)\r\n" ) );
+                    pf( F( "  s               - show simulation variables\r\n" ) );
+                    pf( F( "  s N VALUE       - set simulation variable number N to a VALUE\r\n" ) );
+                    pf( F( "  sR              - reset simulation variables to their default values\r\n" ) );
+                    pf( F( "  r               - restart the simulation\r\n" ) );
+                    pf( F( "  :INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
+                    pf( F( "  .INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
+                    pf( F( "  m START END     - dump the RAM buffer from START to END\r\n" ) );
+                    pf( F( "  mx START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
+                    pf( F( "  mR              - reset the RAM buffer to 00\r\n" ) );
+                    pf( F( "  ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
+                    pf( F( "  i START END     - dump the IO buffer from START to END\r\n" ) );
+                    pf( F( "  ix START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
+                    pf( F( "  iR              - reset the IO buffer to 00\r\n" ) );
+                    pf( F( "  is ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
+                    pf( F( "  vN              - set verboseMode to N (default = 0)\r\n" ) );
                 }
             }
         } // while ( !running )
@@ -791,25 +804,29 @@ void loop() {
         // want to execute this M1 phase
         if ( stopAtM1 >= 0 && m1Count > stopAtM1 ) {
             sprintf( extraInfo, "%d M1 cycles reached", stopAtM1 ), running = false;
-            pf( F( "--------------------------------------------------------------+\r\n" ) );
+            pf( F( "  --------------------------------------------------------------+\r\n" ) );
             goto nextLoop;
         }
 
         // If the address is tri-stated, skip checking various combinations of
         // control signals since they may also be floating and we can't detect that
         if ( !abTristated ) {
+            static bool iowrPrev = 1;
             uint8_t data = 0;
             // Simulate read from RAM
             if ( !mreq && !rd ) {
+                m1Address = ab;
                 if ( ab < ramBegin )
                     data = pgm_read_byte_near( rom + ab );
                 else if ( ab <= ramEnd )
                     data = ram[ ab - ramBegin ];
                 SetDataToDB( data );
                 if ( !m1 )
-                    sprintf( extraInfo, "Opcode read from %04X -> %02X", ab, data );
+                    sprintf( extraInfo, "Opcode read from %s %04X -> %02X",
+                             ab < ramBegin ? "ROM" : "RAM", ab, data );
                 else
-                    sprintf( extraInfo, "Memory read from %04X -> %02X", ab, data );
+                    sprintf( extraInfo, "Memory read from %s %04X -> %02X",
+                             ab < ramBegin ? "ROM" : "RAM", ab, data );
             }
 
             // Simulate interrupt requesting a vector
@@ -820,9 +837,11 @@ void loop() {
 
             // Simulate write to RAM
             else if ( !mreq && !wr ) {
+                GetDataFromDB();
                 if ( ( ab >= ramBegin ) && ( ab <= ramEnd ) )
                     ram[ ab - ramBegin ] = db;
-                sprintf( extraInfo, "Memory write to  %04X <- %02X", ab, db );
+                sprintf( extraInfo, "Memory write to %s  %04X <- %02X",
+                         ab < ramBegin ? "ROM" : "RAM", ab, db );
             }
 
             // Simulate I/O read
@@ -834,8 +853,13 @@ void loop() {
 
             // Simulate I/O write
             else if ( !iorq && !wr ) {
+                GetDataFromDB();
                 io[ ab & ioMask ] = db;
                 sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
+                if ( analyseBasic && iowrPrev && ( ( ab & 0xFF ) == 0 ) ) // console out
+                    sprintf( extraInfo + strlen( extraInfo), "  CONOUT: %c",
+                             isprint( db ) ? db : ' ' );
+
             }
 
             // Capture memory refresh cycle
@@ -845,6 +869,7 @@ void loop() {
 
             else
                 GetDataFromDB();
+            iowrPrev = iorq || wr;
         } else
             GetDataFromDB();
 
@@ -853,14 +878,15 @@ void loop() {
         // If the user wanted to pause simulation after a certain number of
         // clocks, handle it here. If the key pressed to continue was not Enter,
         // stop the simulation to issue that command
-        if ( tracePause == tracePauseCount ) {
+        if ( ( tracePause > 0 && tracePause == tracePauseCount ) || ( pauseAddress && pauseAddress == m1Address ) ) {
             while ( Serial.available() == 0 )
                 ;
             if ( Serial.peek() != '\r' )
                 sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
             else
                 Serial.read();
-            tracePauseCount = 0;
+            if ( tracePause == tracePauseCount )
+                tracePauseCount = 0;
         }
 
         //--------------------------------------------------------

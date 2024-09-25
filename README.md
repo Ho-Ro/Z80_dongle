@@ -1,6 +1,9 @@
+[//]: # (SPDX-License-Identifier: GPL-3.0-or-later)
+
 # Arduino and ZiLOG Z80
 
 ![Z80 dongle](Z80_dongle.jpg)
+My Z80 dongle tests a grinded NMOS Z80 pretending to be an 84C0020
 
 The idea and the software is taken from [Goran Devic](https://baltazarstudios.com/arduino-zilog-z80/).
 
@@ -24,18 +27,19 @@ You can use anything: I use a 2.2uF tantalum cap. The evil thing with not
 putting bypass (or decoupling) caps in your designs is that you may never find out
 why they might behave erratically.
 
-There is also a push button next to the CPU socket, which is optional.
-In contrast to Goran's *sketch* above it is connected to the /RESET pin of the Z80 CPU.
-A Schottky diode decouples this reset button from the Arduino output.
+There is also a push button above the CPU socket, which is optional.
+In contrast to Goran's *sketch* it is connected to the pulled-up /RESET pin of the Z80 CPU.
+A Schottky diode decouples the Arduino output from the switch, converting the push-pull output
+into a kind of open collector pull-down.
 Another push button at the lower edge of the proto board resets the Arduino Mega.
 
-Now, the most interesting extension to the design is a tri-state bus detection.
+Now, the most interesting extension in Gorans design is the tri-state bus detection.
 
 Z80 occasionally puts its address and data buses into `High-Z`, or tri-state,
-and to detect that (it also lets some of its control pins to Z,
-but it is sufficien to detect only the two major buses.) There are 2 pull-down resistors
-(each 10K) making up a weak resistor divider network together with the pull-ups connected
-to pins D0 and A0.
+and to detect that (it also lets some of its control pins (/RD, /WR, /MREQ, /IORQ) to Z,
+but it is sufficient to detect only the two major buses.) There are 2 pull-down resistors
+(each 10k) making up a weak resistor divider network together with the pull-ups connected
+to pins D0 and A0. I use a 10k sil resistor network that pulls also all Z80 control inputs up.
 That way, whenever Z80 releases its data or address bus, the pins will assume 2.5V
 pulled by resistor dividers. Since both bus pins A0 and D0 are also connected to analog
 input pins, Arduino will be able to read the voltage and clearly detect that they are not
@@ -45,7 +49,7 @@ The Arduino Mega board is really useful here since it hosts more I/O pins than y
 ever need, runs on +5V, and therefore needs no voltage level translators to talk to Z80.
 
 The Mega ports are conveniently clustered by their function:
-All eight data wires together, 16 address wires, control signals, and a few odd ones:
+All eight data lines together, 16 address lines, control signals, and a few odd ones:
 clock, which goes to pin 10 on Arduino which is a PWM output that allows to clock the CPU,
 also +5V and GND.
 
@@ -54,38 +58,38 @@ I got the Mega proto board, the Textool (clone) socket and some Z80 CPUs from He
 [Z80 / Arduino setup](https://www.heinpragt-software.com/z80-on-arduimo-mega/)
 to run Z80 programs using the Arduino Mega as ROM, RAM, and IO interface.
 I use the same connections for my Z80 dongle as Hein, so his SW (e.g. a Basic interpreter)
-runs also on this dongle.
+runs also on my dongle.
 
 ## Firmware
 
 The Mega firmware is taken from Goran, I adapted it to my changed connections and added
 commands for memory modification and memory dump. The Arduino communicates via the USB serial connection to the PC with 115200 bps,
 you can use either the serial monitor of the Arduino IDE or any serial terminal program.
-I use e.g. minicom on Linux.
+I use e.g. minicom or picocom on Linux, also the Arduino serial monitor can be used.
 
 Connected through a serial port, you have several commands available (type `?` or `h`
 at the console):
 
 ```
-B               - execute Basic interpreter
-B?              - analyse Basic interpreter
-e0              - set echo off (default)
-e1              - set echo on
-s               - show simulation variables
-s N VALUE       - set simulation variable number N to a VALUE
-sR              - reset simulation variables to their default values
-r               - restart the simulation
-:INTEL-HEX      - reload RAM buffer with ihex data stream
-.INTEL-HEX      - reload IO buffer with a modified ihex data stream
-m START END     - dump the RAM buffer from START to END
-mx START END    - dump the RAM buffer as ihex from START to END
-mR              - reset the RAM buffer to 00
-ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B
-i START END     - dump the IO buffer from START to END
-ix START END    - dump the IO buffer as modified ihex from START to END
-iR              - reset the IO buffer to 00
-is ADR B B B .. - set IO buffer at ADR with data byte(s) B
-vN              - set verboseMode to N (default = 0)
+  A               - analyse ROM Basic interpreter
+  B               - execute ROM Basic interpreter
+  e0              - set echo off
+  e1              - set echo on (default)
+  s               - show simulation variables
+  s N VALUE       - set simulation variable number N to a VALUE
+  sR              - reset simulation variables to their default values
+  r               - restart the simulation
+  :INTEL-HEX      - reload RAM buffer with ihex data stream
+  .INTEL-HEX      - reload IO buffer with a modified ihex data stream
+  m START END     - dump the RAM buffer from START to END
+  mx START END    - dump the RAM buffer as ihex from START to END
+  mR              - reset the RAM buffer to 00
+  ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B
+  i START END     - dump the IO buffer from START to END
+  ix START END    - dump the IO buffer as modified ihex from START to END
+  iR              - reset the IO buffer to 00
+  is ADR B B B .. - set IO buffer at ADR with data byte(s) B
+  vN              - set verboseMode to N (default = 0)
 ```
 
 There are several internal simulation variables that you can change in order to run your tests
@@ -262,19 +266,20 @@ Typing command `s` will show simulation variables that are available to us:
 ```
 s
 ------ Simulation variables ------
-#0  Trace both clock phases  =  0
-#1  Trace refresh cycles     =  1
-#2  Pause for keypress every =  0
-#3  Stop after clock #       = 40
-#4  Stop after M1 cycle #    = -1
-#5  Stop at HALT             =  1
-#6  Issue INT at clock #     = -1
-#7  Issue NMI at clock #     = -1
-#8  Issue BUSRQ at clock #   = -1
-#9  Issue RESET at clock #   = -1
-#10 Issue WAIT at clock #    = -1
-#11 Clear all at clock #     = -1
-#12 Push IORQ vector #(hex)  = FF
+#0  Trace both clock phases  =    0
+#1  Trace refresh cycles     =    1
+#2  Pause for keypress every =    100
+#3  Stop after clock #       =   -1
+#4  Stop after M1 cycle #    =   -1
+#5  Stop at HALT             =    1
+#6  Issue INT at clock #     =   -1
+#7  Issue NMI at clock #     =   -1
+#8  Issue BUSRQ at clock #   =   -1
+#9  Issue RESET at clock #   =   -1
+#10 Issue WAIT at clock #    =   -1
+#11 Clear all at clock #     =   -1
+#12 Push IORQ vector #(hex)  =   FF
+#13 Pause at M1 at #(hex)    = 0000
 ```
 
 The code evolved over time and so did the variables and multitudes of situations that can
@@ -290,19 +295,20 @@ that accompany M1.
 ```
 s 6 120
 ------ Simulation variables ------
-#0  Trace both clock phases  =  0
-#1  Trace refresh cycles     =  1
-#2  Pause for keypress every =  0
-#3  Stop after clock #       = 200
-#4  Stop after M1 cycle #    = -1
-#5  Stop at HALT             =  1
-#6  Issue INT at clock #     = 120
-#7  Issue NMI at clock #     = -1
-#8  Issue BUSRQ at clock #   = -1
-#9  Issue RESET at clock #   = -1
-#10 Issue WAIT at clock #    = -1
-#11 Clear all at clock #     = 130
-#12 Push IORQ vector #(hex)  = 30
+#0  Trace both clock phases  =    0
+#1  Trace refresh cycles     =    1
+#2  Pause for keypress every =    0
+#3  Stop after clock #       =   200
+#4  Stop after M1 cycle #    =   -1
+#5  Stop at HALT             =    1
+#6  Issue INT at clock #     =   120
+#7  Issue NMI at clock #     =   -1
+#8  Issue BUSRQ at clock #   =   -1
+#9  Issue RESET at clock #   =   -1
+#10 Issue WAIT at clock #    =   -1
+#11 Clear all at clock #     =   130
+#12 Push IORQ vector #(hex)  =   30
+#13 Pause at M1 at #(hex)    = 0000
 ```
 
 The program will run for 200 clock cycles (`s 3 200`), issue an interrupt at clock 120 (`s 6 120`),
@@ -850,10 +856,10 @@ Load the IHEX data:
 And run it. Show the IO space with `i 0 10`:
 
 ```
-  IO   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F
---------------------------------------------------------+
-0000 : 00 28 80 00 00 00 00 00  00 00 00 00 00 00 00 00 |
---------------------------------------------------------+
+    IO   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F
++---------------------------------------------------------+
+| 0000 : 00 28 80 00 00 00 00 00  00 00 00 00 00 00 00 00 |
++---------------------------------------------------------+
 ```
 
 - Address 0: 00=NMOS, FF=CMOS
@@ -886,4 +892,4 @@ The SW is based on the Nascom Rom Basic:
 
 and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
 The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
-
+I use parts from the z80retroshield software that emulates ROM, RAM and UART for the Z80.

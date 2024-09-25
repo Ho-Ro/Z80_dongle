@@ -52,15 +52,6 @@ static const uint8_t uP_CLK = 10;     // PB4, was 52/PB1
 // required to meet >100kHz clock
 //
 
-#if 0
-static inline void CLK_HIGH(void) { PORTB = PORTB | 0x02; }
-static inline void CLK_LOW(void) { PORTB = PORTB & 0xFC; }
-static inline uint8_t STATE_RD_N(void) { return (PINB & 0x01); }
-static inline uint8_t STATE_WR_N(void) { return (PING & 0x02); }
-static inline uint8_t STATE_MREQ_N(void) { return (PING & 0x01); }
-static inline uint8_t STATE_IORQ_N(void) { return (PING & 0x04); }
-#endif
-
 static inline void SET_CLK( uint8_t state ) {
     if ( state )
         PORTB |= ( 1 << 4 );
@@ -181,81 +172,6 @@ void Z80RetroShieldClassName::Tick( int cycles ) {
         while ( m_cycle_state-- ) { // clock HIGH, clock LOW
             SET_CLK( m_cycle_state );
 
-#if 0
-
-            //////////////////////////////////////////////////////////////////////
-            // Memory Access?
-            if ( !STATE_MREQ_N() ) {
-                // Store the contents of the address-bus in case we're going to use it.
-                uP_ADDR = ADDR();
-
-                // RAM Read?
-                if ( !STATE_RD_N() ) {
-                    // change DATA port to output to uP:
-                    DATA_DIR( DIR_OUT );
-                    if ( prevMRD ) { // neg edge
-                        if ( m_on_memory_read )
-                            DATA_OUT( m_on_memory_read( uP_ADDR ) );
-                        else
-                            DATA_OUT( 0 );
-                    }
-                    // debug_show_status("MEMR: ");
-                } else if ( !STATE_WR_N() ) {
-                    DATA_DIR( DIR_IN );
-                    // debug_show_status("MEMW: ");
-                    if ( prevMWR ) {
-                        // RAM write
-                        if ( m_on_memory_write != NULL )
-                            m_on_memory_write( uP_ADDR, DATA_IN() );
-                    }
-                }
-
-                // goto tick_tock;
-            }
-
-            //////////////////////////////////////////////////////////////////////
-            // IO Access?
-            else if ( !STATE_IORQ_N() ) {
-                // IO Read?
-                if ( !STATE_RD_N() ) {
-                    // change DATA port to output to uP:
-                    DATA_DIR( DIR_OUT );
-                    if ( prevIORQ ) {
-                        // output data at this cycle too
-                        if ( m_on_io_read )
-                            DATA_OUT( m_on_io_read( ADDR_L() ) );
-                        else
-                            DATA_OUT( 0 );
-                        // debug_show_status("IOR : ");
-                    }
-                }
-                // IO Write?
-                else if ( !STATE_WR_N() ) {
-                    if ( prevIORQ ) {
-                        DATA_DIR( DIR_IN );
-                        // debug_show_status("IOW : ");
-                        if ( m_on_io_write != NULL )
-                            m_on_io_write( ADDR_L(), DATA_IN() );
-                    }
-                }
-                // goto tick_tock;
-            }
-            // debug_show_status( "    : " );
-
-            // tick_tock:
-            prevMRD = STATE_MREQ_N() || STATE_RD_N();
-            prevMWR = STATE_MREQ_N() || STATE_WR_N();
-            prevIORQ = STATE_IORQ_N();
-            // prevIORQ = STATE_IORQ_N();
-
-            //////////////////////////////////////////////////////////////////////
-            // natural delay for DATA Hold time (t_HR)
-            if ( STATE_RD_N() )
-                DATA_DIR( DIR_IN );
-            else
-                DATA_DIR( DIR_OUT );
-
-#else
             // Store the contents of the address-bus in case we're going to use it.
             uP_ADDR = ADDR();
 
@@ -274,13 +190,10 @@ void Z80RetroShieldClassName::Tick( int cycles ) {
                             DATA_OUT( 0 );
                         // IO Read?
                     } else if ( !STATE_IORQ_N() ) {
-                        // if ( prevIORQ ) {
-                        // output data at this cycle
                         if ( m_on_io_read )
                             DATA_OUT( m_on_io_read( ADDR_L() ) );
                         else
                             DATA_OUT( 0 );
-                        // }
                     }
                 }
             } else if ( !STATE_WR_N() ) { // Write Access
@@ -300,8 +213,6 @@ void Z80RetroShieldClassName::Tick( int cycles ) {
 
             prevRD = STATE_RD_N();
             prevWR = STATE_WR_N();
-            // prevIORQ = STATE_IORQ_N();
-            // prevIORQ = STATE_IORQ_N();
 
             //////////////////////////////////////////////////////////////////////
 
@@ -310,13 +221,12 @@ void Z80RetroShieldClassName::Tick( int cycles ) {
                 DATA_DIR( DIR_IN );
             else
                 DATA_DIR( DIR_OUT );
-
-#endif
         }
         // start next cycle
         debug_count_cycle();
     } // for (int cycle = 0; cycle < cycles; cycle++)
 }
+
 
 /*
  * Reset the processor.
