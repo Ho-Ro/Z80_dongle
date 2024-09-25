@@ -1,5 +1,5 @@
-#ifndef NASCOMBASIC_H
-#define NASCOMBASIC_H
+#ifndef ROM_GS_H
+#define ROM_GS_H
 
 // Credits
 //
@@ -7,7 +7,7 @@
 // * Updates were made by Grant Searle.
 // * Further updates from 8bitforce.
 
-PROGMEM const byte rom[] = {
+PROGMEM const byte rom_gs[] = {
 
     // static const unsigned char intmini_data[] =
     0xf3, 0xc3, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00,
