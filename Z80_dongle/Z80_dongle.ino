@@ -481,6 +481,7 @@ void io_write( uint16_t address, uint8_t byte ) {
 // -----------------------------------------------------------
 void loop() {
     uint16_t m1Address = 0;
+    static bool singleStep = false;
     //--------------------------------------------------------
     // Trace/simulation control handler
     //--------------------------------------------------------
@@ -506,6 +507,7 @@ void loop() {
                 // this entry selects one of the two Basic setups
                 // either for analysis (A, B) or execution (G, H)
                 if ( *input == 'A' || *input == 'B' || *input == 'G' || *input == 'H' ) {
+                    singleStep = input[ 1 ] == 's';
                     // "move" the RAM on top of ROM
                     ramBegin = 0x2000;
                     ramEnd = ramBegin + ramLen - 1; // default is 4K size
@@ -529,6 +531,9 @@ void loop() {
                         setupWithInterrupt();                  // this will never return
                         break;
                     }
+                    // signal memory size to HP Basic
+                    ram[0] = (ramEnd + 1) & 0xFF;
+                    ram[1] = (ramEnd + 1) >> 8;
                     DoReset();
                     running = true;
                 }
@@ -580,6 +585,7 @@ void loop() {
 
                 // Option "r"  : reset and run the simulation
                 if ( input[ 0 ] == 'r' ) {
+                    singleStep = input[ 1 ] == 's';
                     // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
                     // If the variable was set, skip reset sequence since we might be testing it.
                     if ( resetAtClk < 0 )
@@ -786,7 +792,6 @@ void loop() {
             }
         } // while ( !running )
     }     // if ( !runing )
-
     if ( runBasic ) {
         //
         // Do we have any pending serial-input?  If so
@@ -893,15 +898,22 @@ void loop() {
         DumpState( suppressDump );
 
         // If the user wanted to pause simulation after a certain number of
-        // clocks, handle it here. If the key pressed to continue was not Enter,
-        // stop the simulation to issue that command
-        if ( ( tracePause > 0 && tracePause == tracePauseCount ) || ( pauseAddress && pauseAddress == m1Address ) ) {
+        // clocks, handle it here.
+        // Enter resumes the simulation, Space advances one clock.
+        // Other keys stop the simulation to issue that command
+        if ( singleStep || ( tracePause > 0 && tracePause == tracePauseCount ) || ( pauseAddress && pauseAddress == m1Address ) ) {
+            singleStep = false;
             while ( Serial.available() == 0 )
-                ;
-            if ( Serial.peek() != '\r' )
-                sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
-            else
+                ; // wait
+            if ( Serial.peek() == ' ') { // step
+                while (Serial.available() ) // remove CR if buffered terminal
+                    Serial.read();
+                singleStep = true;
+            } else if ( Serial.peek() == '\r' ) { // run
                 Serial.read();
+            } else { // break
+                sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
+            }
             if ( tracePause == tracePauseCount )
                 tracePauseCount = 0;
         }
@@ -1146,6 +1158,8 @@ void setupWithInterrupt() {
     ramEnd = ramBegin + sizeof( ram ) - 1; // use full "RAM" size
 
     memset( ram, 0, sizeof( ram ) ); // Clear RAM memory
+    ram[0] = ( ramEnd + 1 ) & 0xFF;
+    ram[1] = ( ramEnd + 1 ) >> 8;
     Serial.begin( 1000000 );
     Serial.println( "Z80 Reset" );
 
