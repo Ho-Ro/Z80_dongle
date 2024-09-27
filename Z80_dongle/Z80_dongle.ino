@@ -153,7 +153,7 @@ uint16_t pauseAddress;   // Pause at M1
 const uint16_t ramLen = 0x1000;
 // more RAM for Basic program
 // reuse as additional space for input and extra, tmp, ftmp
-uint8_t ram[ ramLen + 2560 ];
+uint8_t RAM[ ramLen + 2560 ];
 const uint16_t ramMask = 0xFFF;
 
 static uint16_t ramBegin = 0;
@@ -163,25 +163,25 @@ const uint16_t romLen = 0x2000;
 static uint16_t romBegin = 0;
 static uint16_t romEnd = romBegin + romLen - 1;
 
-uint8_t const *rom = rom_gs;
+uint8_t const *ROM = rom_gs;
 
 // Temp buffer to store input line at the end of Basic RAM, unused at analyser
 static const int INPUT_SIZE = 1024; // enough room for ~400 byte intel hex code input
-char *input = (char *)ram + sizeof( ram ) - INPUT_SIZE;
+char *input = (char *)RAM + sizeof( RAM ) - INPUT_SIZE;
 
 // Temp buffer for extra dump info, at the end of input buffer (unused during output)
 static const int EXTRA_SIZE = 64;
-char *extraInfo = (char *)ram + sizeof( ram ) - EXTRA_SIZE;
+char *extraInfo = (char *)RAM + sizeof( RAM ) - EXTRA_SIZE;
 
 // Buffer simulating IO space for Z80 to access, at unused Basic RAM before input buffer
 const unsigned int ioLen = 0x100;
-byte *io = ram + sizeof( ram ) - INPUT_SIZE - ioLen;
+byte *io = RAM + sizeof( RAM ) - INPUT_SIZE - ioLen;
 const unsigned int ioMask = 0xFF;
 
 const unsigned int tmpLen = 256;
 const unsigned int ftmpLen = 256;
-char *tmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen;
-char *ftmp = (char *)ram + sizeof( ram ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
+char *tmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen;
+char *ftmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
 
 int doEcho = 1;      // Echo received commands
 int verboseMode = 0; // Enable debugging output
@@ -397,7 +397,7 @@ uint8_t memory_read( uint16_t address ) {
     if ( address <= romEnd )
         return ( pgm_read_byte_near( rom_gs + address ) );
     else if ( address <= ramEnd )
-        return ( ram[ address - ramBegin ] );
+        return ( RAM[ address - ramBegin ] );
     else {
         if ( verboseMode )
             pf( F( "*** Read error: %04X\n" ), address );
@@ -411,7 +411,7 @@ uint8_t memory_read( uint16_t address ) {
 //
 void memory_write( uint16_t address, uint8_t value ) {
     if ( address >= ramBegin && address <= ramEnd )
-        ram[ address - ramBegin ] = value;
+        RAM[ address - ramBegin ] = value;
     else if ( verboseMode )
         pf( F( "*** Write error: %4X <- %2X\n" ), address, value );
 }
@@ -487,7 +487,7 @@ void loop() {
     //--------------------------------------------------------
     if ( !running ) {
         pf( F( "  ----------------------------------------------------------------+\r\n" ) );
-        pf( F( "  :Simulation stopped: %s\r\n" ), extraInfo );
+        pf( F( "Simulation stopped: %s\r\n" ), extraInfo );
         extraInfo[ 0 ] = 0;
         digitalWrite( CLK, HIGH );
         zint = nmi = busrq = wait = 1;
@@ -512,28 +512,25 @@ void loop() {
                     ramBegin = 0x2000;
                     ramEnd = ramBegin + ramLen - 1; // default is 4K size
                     switch ( *input ) {
-                    case 'A': // analyse Grant's setup
-                        rom = rom_gs;
-                        analyseBasic = 'A';
+                    case 'A':                      // analyse
+                        if ( input[ 1 ] == 'x' ) { // Hein's Basic
+                            ROM = rom_hp;
+                            analyseBasic = 'x';
+                        } else { // default, Grant's Basic
+                            ROM = rom_gs;
+                            analyseBasic = 'b';
+                        }
+                        // signal memory size to Basic
+                        RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
+                        RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
                         break;
-                    case 'B': // analyse Hein's setup
-                        rom = rom_hp;
-                        analyseBasic = 'B';
-                        break;
-                    case 'G': // run Grant's Basic version
-                        rom = rom_gs;
-                        ramEnd = ramBegin + sizeof( ram ) - 1; // full size
-                        runBasic = true;
-                        break;
-                    case 'H': // run Hein's Basic version
-                        rom = rom_hp;
-                        ramEnd = ramBegin + sizeof( ram ) - 1; // full size
-                        setupWithInterrupt();                  // this will never return
+                    case 'B':                                                  // run Basic
+                        if ( input[ 1 ] == 'x' )                               // Hein's version
+                            runWithInterrupt( rom_hp, 0x2000, sizeof( RAM ) ); // will never return
+                        else                                                   // default, Grants version
+                            runWithInterrupt( rom_gs, 0x2000, sizeof( RAM ) ); // will never return
                         break;
                     }
-                    // signal memory size to HP Basic
-                    ram[0] = (ramEnd + 1) & 0xFF;
-                    ram[1] = (ramEnd + 1) >> 8;
                     DoReset();
                     running = true;
                 }
@@ -569,7 +566,7 @@ void loop() {
                             pf( F( "%04X:" ), adr );
                         for ( int i = 0; i < bytes; i++ ) {
                             if ( isRam )
-                                ram[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
+                                RAM[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
                             else
                                 io[ ( adr + i ) & ioMask ] = hex( pTemp + 8 + 2 * i );
                             if ( verboseMode )
@@ -656,7 +653,7 @@ void loop() {
 
                 if ( input[ 0 ] == 'm' && input[ 1 ] == 'R' ) {
                     // Option "mR"  : reset RAM memory
-                    memset( ram, 0, ramLen );
+                    memset( RAM, 0, ramLen );
                     pf( F( "RAM reset to 00\r\n" ) );
                 } else if ( input[ 0 ] == 'i' && input[ 1 ] == 'R' ) {
                     // Option "iR"  : reset IO memory
@@ -678,7 +675,7 @@ void loop() {
                                 break;
                             if ( sscanf( pTemp + i, "%2X", &val ) == 1 ) {
                                 if ( isRam )
-                                    ram[ end++ ] = val;
+                                    RAM[ end++ ] = val;
                                 else
                                     io[ end++ ] = val;
                             } else
@@ -731,7 +728,7 @@ void loop() {
                             for ( int j = 0; j < 0x10; j++ ) {
                                 unsigned char val;
                                 if ( isRam )
-                                    val = ram[ ( aaa + j ) & ramMask ];
+                                    val = RAM[ ( aaa + j ) & ramMask ];
                                 else
                                     val = io[ ( aaa + j ) & ioMask ];
                                 pf( "%02X", val );
@@ -753,7 +750,7 @@ void loop() {
                                 pf( F( "| %04X : " ), aaa & ioMask );
                             for ( int j = 0; j < 16; j++ ) {
                                 if ( isRam )
-                                    pf( F( "%02X " ), ram[ ( aaa + j ) & ramMask ] );
+                                    pf( F( "%02X " ), RAM[ ( aaa + j ) & ramMask ] );
                                 else
                                     pf( F( "%02X " ), io[ ( aaa + j ) & ioMask ] );
                                 if ( j == 7 )
@@ -767,10 +764,10 @@ void loop() {
 
                 // Option "?"  : print help
                 if ( input[ 0 ] == '?' || input[ 0 ] == 'h' ) {
-                    pf( F( "  A               - analyse Grant Searle's ROM Basic setup\r\n" ) );
-                    pf( F( "  B               - analyse Hein Pragt's ROM Basic setup\r\n" ) );
-                    pf( F( "  G               - execute Grant Searle's ROM Basic setup\r\n" ) );
-                    pf( F( "  H               - execute Hein Pragt's ROM Basic setup\r\n" ) );
+                    pf( F( "  A               - analyse Grant Searle's ROM Basic\r\n" ) );
+                    pf( F( "  Ax              - analyse Hein Pragt's ROM Basic\r\n" ) );
+                    pf( F( "  B               - execute Grant Searle's ROM Basic\r\n" ) );
+                    pf( F( "  Bx              - execute Hein Pragt's ROM Basic\r\n" ) );
                     pf( F( "  e0              - set echo off\r\n" ) );
                     pf( F( "  e1              - set echo on (default)\r\n" ) );
                     pf( F( "  s               - show simulation variables\r\n" ) );
@@ -790,9 +787,9 @@ void loop() {
                     pf( F( "  vN              - set verboseMode to N (default = 0)\r\n" ) );
                 }
             }
-        } // while ( !running )
-    }     // if ( !runing )
-    if ( runBasic ) {
+        }             // while ( !running )
+    }                 // if ( !runing )
+    if ( runBasic ) { // unused, was used together with Grant's 6850 ACIA interrupt driven serial I/O setup
         //
         // Do we have any pending serial-input?  If so
         // trigger an interrupt to the processor.
@@ -843,9 +840,9 @@ void loop() {
             if ( !mreq && !rd ) {
                 m1Address = ab;
                 if ( ab < ramBegin )
-                    data = pgm_read_byte_near( rom + ab );
+                    data = pgm_read_byte_near( ROM + ab );
                 else if ( ab <= ramEnd )
-                    data = ram[ ab - ramBegin ];
+                    data = RAM[ ab - ramBegin ];
                 SetDataToDB( data );
                 if ( !m1 )
                     sprintf( extraInfo, "Opcode read from %s %04X -> %02X", ab < ramBegin ? "ROM" : "RAM", ab, data );
@@ -863,7 +860,7 @@ void loop() {
             else if ( !mreq && !wr ) {
                 GetDataFromDB();
                 if ( ( ab >= ramBegin ) && ( ab <= ramEnd ) )
-                    ram[ ab - ramBegin ] = db;
+                    RAM[ ab - ramBegin ] = db;
                 sprintf( extraInfo, "Memory write to %s  %04X <- %02X", ab < ramBegin ? "ROM" : "RAM", ab, db );
             }
 
@@ -879,8 +876,8 @@ void loop() {
                 GetDataFromDB();
                 io[ ab & ioMask ] = db;
                 sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-                if ( ( analyseBasic == 'A' && iowrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
-                     ( analyseBasic == 'B' && iowrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
+                if ( ( analyseBasic == 'x' && iowrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
+                     ( analyseBasic == 'b' && iowrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
                     sprintf( extraInfo + strlen( extraInfo ), "  CONOUT: %c", isprint( db ) ? db : ' ' );
             }
 
@@ -904,15 +901,15 @@ void loop() {
         if ( singleStep || ( tracePause > 0 && tracePause == tracePauseCount ) || ( pauseAddress && pauseAddress == m1Address ) ) {
             singleStep = false;
             while ( Serial.available() == 0 )
-                ; // wait
-            if ( Serial.peek() == ' ') { // step
-                while (Serial.available() ) // remove CR if buffered terminal
+                ;                            // wait
+            if ( Serial.peek() == ' ' ) {    // step
+                while ( Serial.available() ) // remove CR if buffered terminal
                     Serial.read();
                 singleStep = true;
             } else if ( Serial.peek() == '\r' ) { // run
                 Serial.read();
             } else { // break
-                sprintf( extraInfo, "Continue keypress was not Enter" ), running = false;
+                sprintf( extraInfo, "Continue keypress was not Enter or Space" ), running = false;
             }
             if ( tracePause == tracePauseCount )
                 tracePauseCount = 0;
@@ -1031,12 +1028,12 @@ int readBytesUntilEOL( char *buf, int maxlen ) {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////
-// here comes Hein Pragts Basic interface idea that runs the Z80 with a clk of ~250 kHz
+// here comes Hein Pragts Basic interface idea that runs the Z80 with a clk of ~200 kHz
 // /RD and /WR trigger ATmega interrupts and the ISR stops the Z80 via /WAIT until done
 ///////////////////////////////////////////////////////////////////////////////////////
 
 
-const long fClk = 250000; // Z80 clock speed
+const long fClk = 200000; // Z80 clock speed
 
 
 // Pin defines
@@ -1085,19 +1082,22 @@ const long fClk = 250000; // Z80 clock speed
 #define BUSRQ_PIN_NAME PH0
 #define BUSRQ_OUT 17
 
-inline void SET_WAIT() { PORTG &= ~( 1 << WAIT_PIN_NAME ); }
-inline void RESET_WAIT() { PORTG |= ( 1 << WAIT_PIN_NAME ); }
-inline void SET_RST() { PORTG &= ~( 1 << RST_PIN_NAME ); }
-inline void RESET_RST() { PORTG |= ( 1 << RST_PIN_NAME ); }
-inline void SET_INT() { PORTG &= ~( 1 << INT_PIN_NAME ); }
-inline void RESET_INT() { PORTG |= ( 1 << INT_PIN_NAME ); }
-inline void SET_NMI() { PORTG &= ~( 1 << NMI_PIN_NAME ); }
-inline void RESET_NMI() { PORTG |= ( 1 << NMI_PIN_NAME ); }
-inline void SET_BUSRQ() { PORTH &= ~( 1 << BUSRQ_PIN_NAME ); }
-inline void RESET_BUSRQ() { PORTH |= ( 1 << BUSRQ_PIN_NAME ); }
+inline void WAIT_LOW() { PORTG &= ~( 1 << WAIT_PIN_NAME ); }
+inline void WAIT_HIGH() { PORTG |= ( 1 << WAIT_PIN_NAME ); }
+inline void RES_LOW() { PORTG &= ~( 1 << RST_PIN_NAME ); }
+inline void RES_HIGH() { PORTG |= ( 1 << RST_PIN_NAME ); }
+inline void INT_LOW() { PORTG &= ~( 1 << INT_PIN_NAME ); }
+inline void INT_HIGH() { PORTG |= ( 1 << INT_PIN_NAME ); }
+inline void NMI_LOW() { PORTG &= ~( 1 << NMI_PIN_NAME ); }
+inline void NMI_HIGH() { PORTG |= ( 1 << NMI_PIN_NAME ); }
+inline void BUSRQ_LOW() { PORTH &= ~( 1 << BUSRQ_PIN_NAME ); }
+inline void BUSRQ_HIGH() { PORTH |= ( 1 << BUSRQ_PIN_NAME ); }
 
 
-void setupWithInterrupt() {
+void runWithInterrupt( const uint8_t *rom, uint16_t romLen, uint16_t ramLen ) {
+    Serial.begin( 1000000 );
+    Serial.println( "Start Z80" );
+
     pinMode( A13, INPUT_PULLUP ); // M1
     pinMode( A10, INPUT_PULLUP ); // IOREQ
     pinMode( A9, INPUT_PULLUP );  // MREQ
@@ -1148,27 +1148,26 @@ void setupWithInterrupt() {
     TCCR2A = ( 0 << COM2A1 ) + ( 1 << COM2A0 );             // Toggle OC2A on Compare Match
     TCCR2A |= ( 1 << WGM21 );                               // CTC Mode
     TCCR2B = ( 0 << CS22 ) + ( 0 << CS21 ) + ( 1 << CS20 ); // No Prescaling
-    OCR2A = 16000000 / fClk - 1;
+    OCR2A = 16000000L / fClk - 1;
 
     romBegin = 0;
-    romEnd = 0x2000;
-    rom = rom_hp;
+    romEnd = romLen;
+    ROM = rom;
 
-    ramBegin = 0x2000;
-    ramEnd = ramBegin + sizeof( ram ) - 1; // use full "RAM" size
+    ramBegin = romLen;
+    ramEnd = ramBegin + ramLen - 1;
 
-    memset( ram, 0, sizeof( ram ) ); // Clear RAM memory
-    ram[0] = ( ramEnd + 1 ) & 0xFF;
-    ram[1] = ( ramEnd + 1 ) >> 8;
-    Serial.begin( 1000000 );
-    Serial.println( "Z80 Reset" );
+    memset( RAM, 0, ramLen );         // Clear RAM memory
+    RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF; // set for Basic
+    RAM[ 1 ] = ( ramEnd + 1 ) >> 8;   //
 
-    SET_RST();
-    delayMicroseconds( 4 ); // min 3 clock cycles
-    RESET_RST();
+    RES_LOW();
+    delay( 1 ); // min 3 clock cycles
+    RES_HIGH();
 
-    while ( true )
-        ; // loop, this setup program shall not return
+    while ( true ) { // background tasks can be done here
+        ;            // the Z80 interrupts this loop
+    }
 }
 
 
@@ -1190,7 +1189,7 @@ inline uint8_t DATA_GET() {
 // ------------------------
 
 inline void DATA_PUT( uint8_t d ) {
-    // RESET_WAIT();
+    // WAIT_HIGH();
     DDRL = 0xff; // Set out
     PORTL = d;   // Write
 }
@@ -1199,30 +1198,30 @@ inline void DATA_PUT( uint8_t d ) {
 // Z80 CPU Reads -> RD interrupt
 // -----------------------------
 
-ISR( INT2_vect ) {
-    SET_WAIT();
-    if ( zMREQ ) {
+ISR( INT2_vect ) { // Handle RD
+    WAIT_LOW();
+    if ( zMREQ ) { // Handle MREQ
         unsigned int addr = (unsigned int)( ADDR_LO | ( ADDR_HI << 8 ) );
         if ( addr >= ramBegin ) {                   // 0x20 ) {
             if ( addr <= ramEnd ) {                 // 0x38 ) {
-                DATA_PUT( ram[ addr - ramBegin ] ); // RAM
+                DATA_PUT( RAM[ addr - ramBegin ] ); // RAM
             } else {
                 Serial.print( F( "RD ERROR: " ) );
                 Serial.println( addr, HEX );
             }
         } else {
-            DATA_PUT( pgm_read_byte( rom + addr ) ); // ROM
+            DATA_PUT( pgm_read_byte( ROM + addr ) ); // ROM
         }
     } else if ( zIORQ ) {     // Handle IORQ
         if ( ADDR_LO == 1 ) { // Port 1 returns character from keyboard
-            // SET_WAIT();       // Make wait active because we are slow
+            // WAIT_LOW();       // Make wait active because we are slow
             if ( Serial.available() == 0 ) {
                 DATA_PUT( 0 );
             } else {
                 DATA_PUT( (char)Serial.read() );
             }
         } else if ( ADDR_LO == 2 ) { // Port 2 returns a nonzero value if a key has been pressed.
-            // SET_WAIT();       // Make wait active because we are slow
+            // WAIT_LOW();       // Make wait active because we are slow
             if ( Serial.available() > 0 ) {
                 DATA_PUT( 0xff );
             } else {
@@ -1231,7 +1230,7 @@ ISR( INT2_vect ) {
         } else
             DATA_PUT( 0 ); // Otherwise, it returns 0.
     }
-    RESET_WAIT();
+    WAIT_HIGH();
 }
 
 
@@ -1239,9 +1238,9 @@ ISR( INT2_vect ) {
 // Z80 CPU Writes -> WR Interrupt
 // ------------------------------
 
-ISR( INT3_vect ) {
-    SET_WAIT();
-    if ( zMREQ ) {
+ISR( INT3_vect ) { // Handle WR
+    WAIT_LOW();
+    if ( zMREQ ) { // Handle MREQ
         unsigned int addr = (unsigned int)( ADDR_LO | ( ADDR_HI << 8 ) );
         unsigned char byte = DATA_GET();
         if ( addr > ramEnd ) { // 0x38 ) {
@@ -1251,12 +1250,12 @@ ISR( INT3_vect ) {
             Serial.print( F( "Write ROM: " ) );
             Serial.println( addr, HEX );
         } else {
-            ram[ addr - ramBegin ] = byte; // Can only write into RAM
+            RAM[ addr - ramBegin ] = byte; // Can only write into RAM
         }
     } else if ( zIORQ ) { // Handle IORQ
         if ( ADDR_LO == 1 ) {
             Serial.write( DATA_GET() );
         }
     }
-    RESET_WAIT();
+    WAIT_HIGH();
 }

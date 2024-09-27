@@ -9,3 +9,5 @@
 *.bin
 *.z80
 *.com
+
+build
