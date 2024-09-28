@@ -9,5 +9,7 @@
 *.bin
 *.z80
 *.com
+*.obj
+*.lst
 
 build

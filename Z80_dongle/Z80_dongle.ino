@@ -476,319 +476,329 @@ void io_write( uint16_t address, uint8_t byte ) {
 //////////////////////////////////////////////////////////////////////
 
 
+//--------------------------------------------------------
+// Trace/simulation control handler
+//--------------------------------------------------------
+int controlHandler() {
+    bool singleStep = false;
+    if ( *extraInfo ) {
+        pf( F( "  ----------------------------------------------------------------+\r\n" ) );
+        pf( F( "Simulation stopped: %s\r\n" ), extraInfo );
+        *extraInfo = 0;
+    }
+    digitalWrite( CLK, HIGH );
+    zint = nmi = busrq = wait = 1;
+    WriteControlPins();
+
+    while ( !running ) {
+        pf( F( "> " ) );
+        // Expect a command from the serial port
+        while ( ! Serial.available() )
+            ;
+        if ( Serial.available() > 0 ) {
+            unsigned adr = 0;
+            unsigned end = 0;
+            ramBegin = 0;
+            ramEnd = ramBegin + ramLen - 1;
+            memset( input, 0, INPUT_SIZE );
+            if ( !readBytesUntilEOL( input, INPUT_SIZE - 1 ) )
+                continue;
+
+            // Option ":"  : this is not really a user option.
+            // This is used to input Intel HEX format values into the RAM buffer
+            // Multiple lines may be pasted. They are separated by a space character.
+            char *pTemp = input;
+            while ( *pTemp == ':' || *pTemp == '.' ) {
+                bool isRam = *pTemp == ':';
+                byte bytes = hex( ++pTemp ); // skip ':', start with hex number
+                if ( bytes > 0 ) {
+                    adr = ( hex( pTemp + 2 ) << 8 ) + hex( pTemp + 4 );
+                    // byte recordType = hex( pTemp + 6 );
+                    if ( verboseMode )
+                        pf( F( "%04X:" ), adr );
+                    for ( int i = 0; i < bytes; i++ ) {
+                        if ( isRam )
+                            RAM[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
+                        else
+                            io[ ( adr + i ) & ioMask ] = hex( pTemp + 8 + 2 * i );
+                        if ( verboseMode )
+                            pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
+                    }
+                    if ( verboseMode )
+                        pf( F( "\r\n" ) );
+                }
+                pTemp += 2 * bytes + 10; // Skip to the next possible line of hex entry
+                while ( *pTemp && isspace( *pTemp ) )
+                    ++pTemp; // skip leading space
+            }
+
+            // this entry selects one of the two Basic setups
+            // either for analysis (A, B) or execution (G, H)
+            if ( *input == 'A' || *input == 'B' ) {
+                singleStep = input[ 1 ] == 's';
+                // "move" the RAM on top of ROM
+                ramBegin = 0x2000;
+                ramEnd = ramBegin + ramLen - 1; // default is 4K size
+                if ( *input == 'A' ) { // analyse
+                    if ( input[ 1 ] == 'x' ) { // Hein's Basic
+                        ROM = rom_hp;
+                        analyseBasic = 'x';
+                    } else { // default, Grant's Basic
+                        ROM = rom_gs;
+                        analyseBasic = 'b';
+                    }
+                    // signal memory size to Basic
+                    RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
+                    RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
+                } else {
+                    if ( input[ 1 ] == 'x' )                               // Hein's version
+                        runWithInterrupt( rom_hp, 0x2000, sizeof( RAM ) ); // will never return
+                    else                                                   // default, Grants version
+                        runWithInterrupt( rom_gs, 0x2000, sizeof( RAM ) ); // will never return
+                }
+                DoReset();
+                return singleStep;
+            }
+
+            if ( input[ 0 ] == 'e' ) {
+                if ( input[ 1 ] == '0' )
+                    doEcho = false;
+                else if ( input[ 1 ] == '1' )
+                    doEcho = true;
+                else
+                    continue;
+                pf( "Echo %s\r\n", doEcho ? "on" : "off" );
+                continue;
+            }
+
+            if ( input[ 0 ] == 'v' ) {
+                if ( isdigit( input[ 1 ] ) )
+                    verboseMode = input[ 1 ] - '0';
+                continue;
+            }
+
+            if ( *input == 'c' )
+                running = true;
+            else if ( *input == 'r' || *input == 's' ) {
+                // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
+                // If the variable was set, skip reset sequence since we might be testing it.
+                if ( resetAtClk < 0 )
+                    DoReset();
+                running = true;
+                singleStep = *input == 's';
+            }
+
+            // Option "sR" : reset simulation variables to their default values
+            if ( input[ 0 ] == '#' && input[ 1 ] == 'R' ) {
+                ResetSimulationVars();
+                input[ 1 ] = 0; // Proceed to dump all variables...
+            }
+
+            // Option "#"  : show and set internal control variables
+            if ( input[ 0 ] == '#' ) {
+                // Show or set the simulation parameters
+                int var = 0, value;
+                int args = sscanf( &input[ 1 ], "%d %d", &var, &value );
+                // Parameter for the option #12 is read in as a hex; others are decimal by default
+                if ( var == 12 || var == 13 )
+                    args = sscanf( &input[ 1 ], "%d %x", &var, &value );
+                if ( args == 2 ) {
+                    if ( var == 0 )
+                        traceShowBothPhases = value;
+                    if ( var == 1 )
+                        traceRefresh = value;
+                    if ( var == 2 )
+                        tracePause = value;
+                    if ( var == 3 )
+                        stopAtClk = value;
+                    if ( var == 4 )
+                        stopAtM1 = value;
+                    if ( var == 5 )
+                        stopAtHalt = value;
+                    if ( var == 6 )
+                        intAtClk = value;
+                    if ( var == 7 )
+                        nmiAtClk = value;
+                    if ( var == 8 )
+                        busrqAtClk = value;
+                    if ( var == 9 )
+                        resetAtClk = value;
+                    if ( var == 10 )
+                        waitAtClk = value;
+                    if ( var == 11 )
+                        clearAtClk = value;
+                    if ( var == 12 )
+                        iorqVector = value & 0xFF;
+                    if ( var == 13 )
+                        pauseAddress = value & 0xFFFF;
+                }
+                pf( F( "  ------ Simulation variables --------\r\n" ) );
+                pf( F( "  #0  Trace both clock phases  = %4d\r\n" ), traceShowBothPhases );
+                pf( F( "  #1  Trace refresh cycles     = %4d\r\n" ), traceRefresh );
+                pf( F( "  #2  Pause for keypress every = %4d\r\n" ), tracePause );
+                pf( F( "  #3  Stop after clock #       = %4d\r\n" ), stopAtClk );
+                pf( F( "  #4  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
+                pf( F( "  #5  Stop at HALT             = %4d\r\n" ), stopAtHalt );
+                pf( F( "  #6  Issue INT at clock #     = %4d\r\n" ), intAtClk );
+                pf( F( "  #7  Issue NMI at clock #     = %4d\r\n" ), nmiAtClk );
+                pf( F( "  #8  Issue BUSRQ at clock #   = %4d\r\n" ), busrqAtClk );
+                pf( F( "  #9  Issue RESET at clock #   = %4d\r\n" ), resetAtClk );
+                pf( F( "  #10 Issue WAIT at clock #    = %4d\r\n" ), waitAtClk );
+                pf( F( "  #11 Clear all at clock #     = %4d\r\n" ), clearAtClk );
+                pf( F( "  #12 Push IORQ vector #(hex)  =   %02X\r\n" ), iorqVector );
+                pf( F( "  #13 Pause at M1 from #(hex)  = %04X\r\n" ), pauseAddress );
+            }
+
+            if ( input[ 0 ] == 'm' && input[ 1 ] == 'R' ) {
+                // Option "mR"  : reset RAM memory
+                memset( RAM, 0, ramLen );
+                pf( F( "RAM reset to 00\r\n" ) );
+            } else if ( input[ 0 ] == 'i' && input[ 1 ] == 'R' ) {
+                // Option "iR"  : reset IO memory
+                memset( io, 0, ioLen );
+                pf( F( "IO reset to 00\r\n" ) );
+            } else if ( ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) && input[ 1 ] == 's' ) {
+                // Option "ms"  : set RAM memory from ADR to byte(s) B
+                // Option "is"  : set IO memory from ADR to byte(s) B
+                // ms/is ADR B B B ...
+                bool isRam = input[ 0 ] == 'm';
+                int i = 2;
+                if ( !isxdigit( input[ 2 ] ) )
+                    i = nextHex( input, 0 ); // skip to start of adr
+                unsigned val;
+                if ( i && sscanf( pTemp + i, "%04X ", &adr ) == 1 ) {
+                    end = adr;
+                    while ( ( i = nextHex( pTemp, i ) ) ) {
+                        if ( end >= ( isRam ? ramLen : ioLen ) )
+                            break;
+                        if ( sscanf( pTemp + i, "%2X", &val ) == 1 ) {
+                            if ( isRam )
+                                RAM[ end++ ] = val;
+                            else
+                                io[ end++ ] = val;
+                        } else
+                            break;
+                    }
+                    pTemp[ 1 ] = 0; // "fall through" to mem/io dump
+                }
+            }
+
+            if ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) {
+                // Option "m START END"  : dump RAM memory
+                // Option "i START END"  : dump IO memory
+                // START and END are optional
+                // START defaults to 0 or ADR from "ms adr ..."
+                // END defaults to START + 0x100
+                // Option "mx" : same in intel hex format
+                bool isRam = input[ 0 ] == 'm';
+                bool isHex = false;
+                int i = 1, rc = 0;
+                if ( input[ 1 ] == 'x' ) {
+                    isHex = true;
+                    i = 2;
+                }
+                if ( !isxdigit( input[ i ] ) )
+                    i = nextHex( input, 0 ); // skip to start of adr
+                if ( i )
+                    rc = sscanf( input + i, "%04X", &adr );
+                adr &= 0xFF0;                                    // fit to line
+                if ( !end && rc && ( i = nextHex( input, i ) ) ) // one more argument
+                    rc = sscanf( input + i, "%04X", &end );
+                if ( isRam ) {
+                    if ( !end )
+                        end = adr + 0x100;
+                    if ( end > ramLen )
+                        end = ramLen - 1;
+                } else { // IO
+                    if ( !end )
+                        end = ioLen - 1;
+                }
+                if ( isHex ) { //
+                    for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
+                        if ( isRam )
+                            pf( F( ":10%04X00" ), aaa & ramMask );
+                        else
+                            pf( F( ".10%04X00" ), aaa & ioMask );
+                        unsigned char cs = 0;
+                        cs -= 0x10; // datalen
+                        cs -= (aaa)&0xFF;
+                        cs -= ( aaa >> 8 ) & 0x0F;
+                        for ( int j = 0; j < 0x10; j++ ) {
+                            unsigned char val;
+                            if ( isRam )
+                                val = RAM[ ( aaa + j ) & ramMask ];
+                            else
+                                val = io[ ( aaa + j ) & ioMask ];
+                            pf( "%02X", val );
+                            cs -= val;
+                        }
+                        pf( "%02X\r\n", cs );
+                    }
+                    if ( isRam )
+                        pf( F( ":00000001FF\r\n" ) );
+                    else
+                        pf( F( ".00000001FF\r\n" ) );
+                } else { // normal dump, RAM or IO
+                    pf( F( "   %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ), isRam ? "MEM" : " IO" );
+                    pf( F( "+---------------------------------------------------------+\r\n" ) );
+                    for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
+                        if ( isRam )
+                            pf( F( "| %04X : " ), aaa & ramMask );
+                        else
+                            pf( F( "| %04X : " ), aaa & ioMask );
+                        for ( int j = 0; j < 16; j++ ) {
+                            if ( isRam )
+                                pf( F( "%02X " ), RAM[ ( aaa + j ) & ramMask ] );
+                            else
+                                pf( F( "%02X " ), io[ ( aaa + j ) & ioMask ] );
+                            if ( j == 7 )
+                                pf( F( " " ) );
+                        }
+                        pf( F( "|\r\n" ) );
+                    }
+                    pf( F( "+---------------------------------------------------------+\r\n" ) );
+                }
+            }
+
+            // Option "?"  : print help
+            if ( input[ 0 ] == '?' || input[ 0 ] == 'h' ) {
+                pf( F( "  A               - analyse Grant Searle's ROM Basic\r\n" ) );
+                pf( F( "  Ax              - analyse Hein Pragt's ROM Basic\r\n" ) );
+                pf( F( "  B               - execute Grant Searle's ROM Basic\r\n" ) );
+                pf( F( "  Bx              - execute Hein Pragt's ROM Basic\r\n" ) );
+                pf( F( "  e0              - set echo off\r\n" ) );
+                pf( F( "  e1              - set echo on (default)\r\n" ) );
+                pf( F( "  #               - show simulation variables\r\n" ) );
+                pf( F( "  # N VALUE       - set simulation variable number N to a VALUE\r\n" ) );
+                pf( F( "  #R              - reset simulation variables to their default values\r\n" ) );
+                pf( F( "  r               - restart the simulation\r\n" ) );
+                pf( F( "  :INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
+                pf( F( "  .INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
+                pf( F( "  m START END     - dump the RAM buffer from START to END\r\n" ) );
+                pf( F( "  mx START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
+                pf( F( "  mR              - reset the RAM buffer to 00\r\n" ) );
+                pf( F( "  ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
+                pf( F( "  i START END     - dump the IO buffer from START to END\r\n" ) );
+                pf( F( "  ix START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
+                pf( F( "  iR              - reset the IO buffer to 00\r\n" ) );
+                pf( F( "  is ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
+                pf( F( "  vN              - set verboseMode to N (default = 0)\r\n" ) );
+            }
+        }
+    }             // while ( !running )
+    return singleStep;
+}
+
+
 // -----------------------------------------------------------
 // Main loop routine runs over and over again forever
 // -----------------------------------------------------------
 void loop() {
     uint16_t m1Address = 0;
     static bool singleStep = false;
-    //--------------------------------------------------------
-    // Trace/simulation control handler
-    //--------------------------------------------------------
     if ( !running ) {
-        pf( F( "  ----------------------------------------------------------------+\r\n" ) );
-        pf( F( "Simulation stopped: %s\r\n" ), extraInfo );
-        extraInfo[ 0 ] = 0;
-        digitalWrite( CLK, HIGH );
-        zint = nmi = busrq = wait = 1;
-        WriteControlPins();
-
-        while ( !running ) {
-            // Expect a command from the serial port
-            if ( Serial.available() > 0 ) {
-                unsigned adr = 0;
-                unsigned end = 0;
-                ramBegin = 0;
-                ramEnd = ramBegin + ramLen - 1;
-                memset( input, 0, INPUT_SIZE );
-                if ( !readBytesUntilEOL( input, INPUT_SIZE - 1 ) )
-                    continue;
-
-                // this entry selects one of the two Basic setups
-                // either for analysis (A, B) or execution (G, H)
-                if ( *input == 'A' || *input == 'B' || *input == 'G' || *input == 'H' ) {
-                    singleStep = input[ 1 ] == 's';
-                    // "move" the RAM on top of ROM
-                    ramBegin = 0x2000;
-                    ramEnd = ramBegin + ramLen - 1; // default is 4K size
-                    switch ( *input ) {
-                    case 'A':                      // analyse
-                        if ( input[ 1 ] == 'x' ) { // Hein's Basic
-                            ROM = rom_hp;
-                            analyseBasic = 'x';
-                        } else { // default, Grant's Basic
-                            ROM = rom_gs;
-                            analyseBasic = 'b';
-                        }
-                        // signal memory size to Basic
-                        RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
-                        RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
-                        break;
-                    case 'B':                                                  // run Basic
-                        if ( input[ 1 ] == 'x' )                               // Hein's version
-                            runWithInterrupt( rom_hp, 0x2000, sizeof( RAM ) ); // will never return
-                        else                                                   // default, Grants version
-                            runWithInterrupt( rom_gs, 0x2000, sizeof( RAM ) ); // will never return
-                        break;
-                    }
-                    DoReset();
-                    running = true;
-                }
-
-                if ( input[ 0 ] == 'e' ) {
-                    if ( input[ 1 ] == '0' )
-                        doEcho = false;
-                    else if ( input[ 1 ] == '1' )
-                        doEcho = true;
-                    else
-                        continue;
-                    pf( "Echo %s\r\n", doEcho ? "on" : "off" );
-                    continue;
-                }
-
-                if ( input[ 0 ] == 'v' ) {
-                    if ( isdigit( input[ 1 ] ) )
-                        verboseMode = input[ 1 ] - '0';
-                    continue;
-                }
-
-                // Option ":"  : this is not really a user option.
-                // This is used to input Intel HEX format values into the RAM buffer
-                // Multiple lines may be pasted. They are separated by a space character.
-                char *pTemp = input;
-                while ( *pTemp == ':' || *pTemp == '.' ) {
-                    bool isRam = *pTemp == ':';
-                    byte bytes = hex( ++pTemp ); // skip ':', start with hex number
-                    if ( bytes > 0 ) {
-                        adr = ( hex( pTemp + 2 ) << 8 ) + hex( pTemp + 4 );
-                        // byte recordType = hex( pTemp + 6 );
-                        if ( verboseMode )
-                            pf( F( "%04X:" ), adr );
-                        for ( int i = 0; i < bytes; i++ ) {
-                            if ( isRam )
-                                RAM[ ( adr + i ) & ramMask ] = hex( pTemp + 8 + 2 * i );
-                            else
-                                io[ ( adr + i ) & ioMask ] = hex( pTemp + 8 + 2 * i );
-                            if ( verboseMode )
-                                pf( F( " %02X" ), hex( pTemp + 8 + 2 * i ) );
-                        }
-                        if ( verboseMode )
-                            pf( F( "\r\n" ) );
-                    }
-                    pTemp += 2 * bytes + 10; // Skip to the next possible line of hex entry
-                    while ( *pTemp && isspace( *pTemp ) )
-                        ++pTemp; // skip leading space
-                }
-
-                // Option "r"  : reset and run the simulation
-                if ( input[ 0 ] == 'r' ) {
-                    singleStep = input[ 1 ] == 's';
-                    // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
-                    // If the variable was set, skip reset sequence since we might be testing it.
-                    if ( resetAtClk < 0 )
-                        DoReset();
-                    running = true;
-                }
-
-                // Option "sR" : reset simulation variables to their default values
-                if ( input[ 0 ] == 's' && input[ 1 ] == 'R' ) {
-                    ResetSimulationVars();
-                    input[ 1 ] = 0; // Proceed to dump all variables...
-                }
-
-                // Option "s"  : show and set internal control variables
-                if ( input[ 0 ] == 's' ) {
-                    // Show or set the simulation parameters
-                    int var = 0, value;
-                    int args = sscanf( &input[ 1 ], "%d %d", &var, &value );
-                    // Parameter for the option #12 is read in as a hex; others are decimal by default
-                    if ( var == 12 || var == 13 )
-                        args = sscanf( &input[ 1 ], "%d %x", &var, &value );
-                    if ( args == 2 ) {
-                        if ( var == 0 )
-                            traceShowBothPhases = value;
-                        if ( var == 1 )
-                            traceRefresh = value;
-                        if ( var == 2 )
-                            tracePause = value;
-                        if ( var == 3 )
-                            stopAtClk = value;
-                        if ( var == 4 )
-                            stopAtM1 = value;
-                        if ( var == 5 )
-                            stopAtHalt = value;
-                        if ( var == 6 )
-                            intAtClk = value;
-                        if ( var == 7 )
-                            nmiAtClk = value;
-                        if ( var == 8 )
-                            busrqAtClk = value;
-                        if ( var == 9 )
-                            resetAtClk = value;
-                        if ( var == 10 )
-                            waitAtClk = value;
-                        if ( var == 11 )
-                            clearAtClk = value;
-                        if ( var == 12 )
-                            iorqVector = value & 0xFF;
-                        if ( var == 13 )
-                            pauseAddress = value & 0xFFFF;
-                    }
-                    pf( F( "  ------ Simulation variables --------\r\n" ) );
-                    pf( F( "  #0  Trace both clock phases  = %4d\r\n" ), traceShowBothPhases );
-                    pf( F( "  #1  Trace refresh cycles     = %4d\r\n" ), traceRefresh );
-                    pf( F( "  #2  Pause for keypress every = %4d\r\n" ), tracePause );
-                    pf( F( "  #3  Stop after clock #       = %4d\r\n" ), stopAtClk );
-                    pf( F( "  #4  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
-                    pf( F( "  #5  Stop at HALT             = %4d\r\n" ), stopAtHalt );
-                    pf( F( "  #6  Issue INT at clock #     = %4d\r\n" ), intAtClk );
-                    pf( F( "  #7  Issue NMI at clock #     = %4d\r\n" ), nmiAtClk );
-                    pf( F( "  #8  Issue BUSRQ at clock #   = %4d\r\n" ), busrqAtClk );
-                    pf( F( "  #9  Issue RESET at clock #   = %4d\r\n" ), resetAtClk );
-                    pf( F( "  #10 Issue WAIT at clock #    = %4d\r\n" ), waitAtClk );
-                    pf( F( "  #11 Clear all at clock #     = %4d\r\n" ), clearAtClk );
-                    pf( F( "  #12 Push IORQ vector #(hex)  =   %02X\r\n" ), iorqVector );
-                    pf( F( "  #13 Pause at M1 from #(hex)  = %04X\r\n" ), pauseAddress );
-                }
-
-                if ( input[ 0 ] == 'm' && input[ 1 ] == 'R' ) {
-                    // Option "mR"  : reset RAM memory
-                    memset( RAM, 0, ramLen );
-                    pf( F( "RAM reset to 00\r\n" ) );
-                } else if ( input[ 0 ] == 'i' && input[ 1 ] == 'R' ) {
-                    // Option "iR"  : reset IO memory
-                    memset( io, 0, ioLen );
-                    pf( F( "IO reset to 00\r\n" ) );
-                } else if ( ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) && input[ 1 ] == 's' ) {
-                    // Option "ms"  : set RAM memory from ADR to byte(s) B
-                    // Option "is"  : set IO memory from ADR to byte(s) B
-                    // ms/is ADR B B B ...
-                    bool isRam = input[ 0 ] == 'm';
-                    int i = 2;
-                    if ( !isxdigit( input[ 2 ] ) )
-                        i = nextHex( input, 0 ); // skip to start of adr
-                    unsigned val;
-                    if ( i && sscanf( pTemp + i, "%04X ", &adr ) == 1 ) {
-                        end = adr;
-                        while ( ( i = nextHex( pTemp, i ) ) ) {
-                            if ( end >= ( isRam ? ramLen : ioLen ) )
-                                break;
-                            if ( sscanf( pTemp + i, "%2X", &val ) == 1 ) {
-                                if ( isRam )
-                                    RAM[ end++ ] = val;
-                                else
-                                    io[ end++ ] = val;
-                            } else
-                                break;
-                        }
-                        pTemp[ 1 ] = 0; // "fall through" to mem/io dump
-                    }
-                }
-
-                if ( input[ 0 ] == 'm' || input[ 0 ] == 'i' ) {
-                    // Option "m START END"  : dump RAM memory
-                    // Option "i START END"  : dump IO memory
-                    // START and END are optional
-                    // START defaults to 0 or ADR from "ms adr ..."
-                    // END defaults to START + 0x100
-                    // Option "mx" : same in intel hex format
-                    bool isRam = input[ 0 ] == 'm';
-                    bool isHex = false;
-                    int i = 1, rc = 0;
-                    if ( input[ 1 ] == 'x' ) {
-                        isHex = true;
-                        i = 2;
-                    }
-                    if ( !isxdigit( input[ i ] ) )
-                        i = nextHex( input, 0 ); // skip to start of adr
-                    if ( i )
-                        rc = sscanf( input + i, "%04X", &adr );
-                    adr &= 0xFF0;                                    // fit to line
-                    if ( !end && rc && ( i = nextHex( input, i ) ) ) // one more argument
-                        rc = sscanf( input + i, "%04X", &end );
-                    if ( isRam ) {
-                        if ( !end )
-                            end = adr + 0x100;
-                        if ( end > ramLen )
-                            end = ramLen - 1;
-                    } else { // IO
-                        if ( !end )
-                            end = ioLen - 1;
-                    }
-                    if ( isHex ) { //
-                        for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
-                            if ( isRam )
-                                pf( F( ":10%04X00" ), aaa & ramMask );
-                            else
-                                pf( F( ".10%04X00" ), aaa & ioMask );
-                            unsigned char cs = 0;
-                            cs -= 0x10; // datalen
-                            cs -= (aaa)&0xFF;
-                            cs -= ( aaa >> 8 ) & 0x0F;
-                            for ( int j = 0; j < 0x10; j++ ) {
-                                unsigned char val;
-                                if ( isRam )
-                                    val = RAM[ ( aaa + j ) & ramMask ];
-                                else
-                                    val = io[ ( aaa + j ) & ioMask ];
-                                pf( "%02X", val );
-                                cs -= val;
-                            }
-                            pf( "%02X\r\n", cs );
-                        }
-                        if ( isRam )
-                            pf( F( ":00000001FF\r\n" ) );
-                        else
-                            pf( F( ".00000001FF\r\n" ) );
-                    } else { // normal dump, RAM or IO
-                        pf( F( "   %-3s   00 01 02 03 04 05 06 07  08 09 0A 0B 0C 0D 0E 0F\r\n" ), isRam ? "MEM" : " IO" );
-                        pf( F( "+---------------------------------------------------------+\r\n" ) );
-                        for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
-                            if ( isRam )
-                                pf( F( "| %04X : " ), aaa & ramMask );
-                            else
-                                pf( F( "| %04X : " ), aaa & ioMask );
-                            for ( int j = 0; j < 16; j++ ) {
-                                if ( isRam )
-                                    pf( F( "%02X " ), RAM[ ( aaa + j ) & ramMask ] );
-                                else
-                                    pf( F( "%02X " ), io[ ( aaa + j ) & ioMask ] );
-                                if ( j == 7 )
-                                    pf( F( " " ) );
-                            }
-                            pf( F( "|\r\n" ) );
-                        }
-                        pf( F( "+---------------------------------------------------------+\r\n" ) );
-                    }
-                }
-
-                // Option "?"  : print help
-                if ( input[ 0 ] == '?' || input[ 0 ] == 'h' ) {
-                    pf( F( "  A               - analyse Grant Searle's ROM Basic\r\n" ) );
-                    pf( F( "  Ax              - analyse Hein Pragt's ROM Basic\r\n" ) );
-                    pf( F( "  B               - execute Grant Searle's ROM Basic\r\n" ) );
-                    pf( F( "  Bx              - execute Hein Pragt's ROM Basic\r\n" ) );
-                    pf( F( "  e0              - set echo off\r\n" ) );
-                    pf( F( "  e1              - set echo on (default)\r\n" ) );
-                    pf( F( "  s               - show simulation variables\r\n" ) );
-                    pf( F( "  s N VALUE       - set simulation variable number N to a VALUE\r\n" ) );
-                    pf( F( "  sR              - reset simulation variables to their default values\r\n" ) );
-                    pf( F( "  r               - restart the simulation\r\n" ) );
-                    pf( F( "  :INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
-                    pf( F( "  .INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
-                    pf( F( "  m START END     - dump the RAM buffer from START to END\r\n" ) );
-                    pf( F( "  mx START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
-                    pf( F( "  mR              - reset the RAM buffer to 00\r\n" ) );
-                    pf( F( "  ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
-                    pf( F( "  i START END     - dump the IO buffer from START to END\r\n" ) );
-                    pf( F( "  ix START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
-                    pf( F( "  iR              - reset the IO buffer to 00\r\n" ) );
-                    pf( F( "  is ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
-                    pf( F( "  vN              - set verboseMode to N (default = 0)\r\n" ) );
-                }
-            }
-        }             // while ( !running )
-    }                 // if ( !runing )
+        singleStep = controlHandler();
+    }
     if ( runBasic ) { // unused, was used together with Grant's 6850 ACIA interrupt driven serial I/O setup
         //
         // Do we have any pending serial-input?  If so
@@ -838,16 +848,17 @@ void loop() {
             uint8_t data = 0;
             // Simulate read from RAM
             if ( !mreq && !rd ) {
-                m1Address = ab;
                 if ( ab < ramBegin )
                     data = pgm_read_byte_near( ROM + ab );
                 else if ( ab <= ramEnd )
                     data = RAM[ ab - ramBegin ];
                 SetDataToDB( data );
-                if ( !m1 )
+                if ( !m1 ) {
+                    m1Address = ab;
                     sprintf( extraInfo, "Opcode read from %s %04X -> %02X", ab < ramBegin ? "ROM" : "RAM", ab, data );
-                else
+                } else {
                     sprintf( extraInfo, "Memory read from %s %04X -> %02X", ab < ramBegin ? "ROM" : "RAM", ab, data );
+                }
             }
 
             // Simulate interrupt requesting a vector
@@ -908,8 +919,10 @@ void loop() {
                 singleStep = true;
             } else if ( Serial.peek() == '\r' ) { // run
                 Serial.read();
-            } else { // break
-                sprintf( extraInfo, "Continue keypress was not Enter or Space" ), running = false;
+            } else {
+                running = false;
+                // goto nextLoop;
+                singleStep = controlHandler();
             }
             if ( tracePause == tracePauseCount )
                 tracePauseCount = 0;
@@ -1135,9 +1148,11 @@ void runWithInterrupt( const uint8_t *rom, uint16_t romLen, uint16_t ramLen ) {
     pinMode( 18, INPUT_PULLUP ); // WR
     pinMode( 19, INPUT_PULLUP ); // RD
 
-    // Data bus default out
-    // DDRL = 0xff; // Data Bus
-    // PORTL = 0x00;
+    RES_LOW();
+
+    // Data bus default in
+    DDRL = 0x00;  // Data Bus in
+    PORTL = 0x00; // No pull-up
 
     // Pin Interrupts RD and WR Trigger falling edge
     EICRA |= ( 1 << ISC31 ) + ( 0 << ISC30 ) + ( 1 << ISC21 ) + ( 0 << ISC20 );
@@ -1161,9 +1176,7 @@ void runWithInterrupt( const uint8_t *rom, uint16_t romLen, uint16_t ramLen ) {
     RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF; // set for Basic
     RAM[ 1 ] = ( ramEnd + 1 ) >> 8;   //
 
-    RES_LOW();
-    delay( 1 ); // min 3 clock cycles
-    RES_HIGH();
+    RES_HIGH(); // ready to go
 
     while ( true ) { // background tasks can be done here
         ;            // the Z80 interrupts this loop
