@@ -379,9 +379,8 @@ int controlHandler() {
             ;
         unsigned adr = 0;
         unsigned end = 0;
-        ramBegin = 0;
-        ramEnd = ramBegin + ramLen - 1;
         memset( input, 0, INPUT_SIZE );
+
         if ( !readBytesUntilEOL( input, INPUT_SIZE - 1 ) )
             continue;
 
@@ -419,7 +418,6 @@ int controlHandler() {
         // either for analysis (A, B) or execution (G, H)
         case 'A':
         case 'B':
-            singleStep = opt == 's';
             // "move" the RAM on top of ROM
             ramBegin = 0x2000;
             ramEnd = ramBegin + ramLen - 1; // default is 4K size
@@ -434,6 +432,7 @@ int controlHandler() {
                 // signal memory size to Basic
                 RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                 RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
+                singleStep = running = true;
             } else {                                                   // 'B'
                 if ( opt == 'X' )                                      // Hein's version
                     runWithInterrupt( rom_hp, 0x2000, sizeof( RAM ) ); // will never return
@@ -441,7 +440,7 @@ int controlHandler() {
                     runWithInterrupt( rom_gs, 0x2000, sizeof( RAM ) ); // will never return
             }
             DoReset();
-            return singleStep;
+            break;
 
         case 'E':
             if ( opt == '0' )
@@ -458,18 +457,20 @@ int controlHandler() {
                 verboseMode = opt - '0';
             break;
 
-        case 'C':
-            running = true;
+        case 'C': // continue
+            running = singleStep = true;
             break;
-        case 'R':
-        case 'S':
+
+        case 'R': // reset
             // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
             // If the variable was set, skip reset sequence since we might be testing it.
+            ramBegin = 0;
+            ramEnd = ramBegin + ramLen - 1;
             if ( resetAtClk < 0 )
                 DoReset();
-            running = true;
-            singleStep = cmd == 'S';
+            running = singleStep = true;
             break;
+
         case '#':
             // Option "#R" : reset simulation variables to their default values
             if ( opt == 'R' ) {
@@ -530,8 +531,9 @@ int controlHandler() {
                 pf( F( "  #13 Pause at M1 from #(hex)  = %04X\r\n" ), pauseAddress );
                 break;
             }
-        case 'M':
-        case 'I': {
+
+        case 'M':   // memory
+        case 'I': { // IO
             if ( cmd == 'M' && opt == 'R' ) {
                 // Option "MR"  : reset RAM memory
                 memset( RAM, 0, ramLen );
