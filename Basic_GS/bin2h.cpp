@@ -10,12 +10,11 @@ int main( int argc, char *argv[] ) {
 	in = fopen( "intmini.obj", "rb" );
 	fread( rom, 1, sizeof( rom ), in );
 	fclose( in );
-	printf( "{" );
 	for ( int iii = 0; iii < romsize; ++iii ) {
 		if ( (iii & 0x07) == 0 )
-			printf( "\n    /* %04x */ ", iii );
-		printf( "0x%02x%s", rom[ iii ], iii < romsize-1 ? ", " : "" );
+			printf( "\n    /* %04x */", iii );
+		printf( " 0x%02x,", rom[ iii ] );
 	}
-	printf( "\n};\n" );
+	printf( "\n" );
 	return 0;
 }

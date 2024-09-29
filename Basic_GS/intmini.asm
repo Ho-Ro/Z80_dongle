@@ -45,8 +45,7 @@ RST00:          DI                      ;Disable interrupts
 ; TX a character over RS232
 
                 .ORG    0008H
-RST08:          ; JP      TXA
-                OUT     (1),A
+RST08:          OUT     (1),A
                 RET
 
                 .FILL   0010H-$,0       ; Padding so RST10 starts at org 0x0010H
@@ -55,10 +54,7 @@ RST08:          ; JP      TXA
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
 
                 .ORG    0010H
-RST10:          ;JP      RXA
-                ;IN      A,(2)
-                ;OR      A
-                RST     $18
+RST10:          RST     $18
                 JR      Z,RST10
                 IN      A,(1)
                 RET
@@ -69,85 +65,11 @@ RST10:          ;JP      RXA
 ; Check serial status
 
                 .ORG    0018H
-RST18:          ;JP      CKINCHAR
-                IN      A,(2)
+RST18:          IN      A,(2)
                 OR      A
                 RET
-#if 0
-                .FILL   0038H-$,0
 
 ;------------------------------------------------------------------------------
-; RST 38 - INTERRUPT VECTOR [ for IM 1 ]
-
-                .ORG    0038H
-RST38:          JR      serialInt
-
-;------------------------------------------------------------------------------
-serialInt:      PUSH    AF
-                PUSH    HL
-                IN      A,(00h)         ; RECEIVE CHAR
-
-                PUSH    AF
-                LD      A,(serBufUsed)
-                CP      SER_BUFSIZE     ; If full then ignore
-                JR      NZ,notFull
-                POP     AF
-                JR      rts0
-
-notFull:        LD      HL,(serInPtr)
-                INC     HL
-                LD      A,L             ; Only need to check low byte becasuse buffer<256 bytes
-                CP      (serBuf+SER_BUFSIZE) & 0FFH
-                JR      NZ, notWrap
-                LD      HL,serBuf
-notWrap:        LD      (serInPtr),HL
-                POP     AF
-                LD      (HL),A
-                LD      A,(serBufUsed)
-                INC     A
-                LD      (serBufUsed),A
-                CP      SER_FULLSIZE
-                JR      C,rts0
-rts0:           POP     HL
-                POP     AF
-                EI
-                RETI
-
-;------------------------------------------------------------------------------
-RXA:
-waitForChar:    LD      A,(serBufUsed)
-                CP      00H
-                JR      Z, waitForChar
-                PUSH    HL
-                LD      HL,(serRdPtr)
-                INC     HL
-                LD      A,L             ; Only need to check low byte becasuse buffer<256 bytes
-                CP      (serBuf+SER_BUFSIZE) & 0FFH
-                JR      NZ, notRdWrap
-                LD      HL,serBuf
-notRdWrap:      DI
-                LD      (serRdPtr),HL
-                LD      A,(serBufUsed)
-                DEC     A
-                LD      (serBufUsed),A
-                CP      SER_EMPTYSIZE
-                JR      NC,rts1
-rts1:
-                LD      A,(HL)
-                EI
-                POP     HL
-                RET                     ; Char ready in A
-
-;------------------------------------------------------------------------------
-TXA:            OUT     (00h),A
-		RET
-
-
-;------------------------------------------------------------------------------
-CKINCHAR:       LD      A,(serBufUsed)
-                CP      0
-                RET
-#endif
 PRINT:          LD      A,(HL)          ; Get character
                 OR      A               ; Is it $00 ?
                 RET     Z               ; Then RETurn on terminator

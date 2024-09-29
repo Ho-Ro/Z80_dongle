@@ -7,15 +7,27 @@ FQBN = arduino:avr:mega
 PORT = /dev/ttyACM0
 
 INO = $(PRJ)/$(PRJ).ino
-H = $(PRJ)/*.h
+ASM = Basic_GS/intmini.asm
 
 BUILD = $(PRJ)/build/$(subst :,.,$(FQBN))
 
 HEX = $(BUILD)/$(PRJ).ino.hex
 
+INC = $(PRJ)/intmini.h
 
-$(HEX): $(INO) $(H) Makefile
+
+$(HEX): $(INO) $(ASM) $(INC) Makefile
+	make -C Basic_GS
 	arduino-cli compile --export-binaries --warnings all --fqbn $(FQBN) $<
+
+#$(INC): Basic_GS/intmini.obj Basic_GS/bin2h
+#	Basic_GS/bin2h > $@
+
+#Basic_GS/intmini.obj: Basic_GS/intmini.asm
+#	uz80as $<
+
+#Basic_GS/bin2h: Basic_GS/bin2h.cpp
+#	gcc -Wall -o $@ $<
 
 
 .PHONY: upload
