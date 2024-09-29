@@ -130,7 +130,7 @@ BN      .EQU   28H             ; BIN error
 
 COLD:   JP      STARTB          ; Jump for cold start
 WARM:   JP      WARMST          ; Jump for warm start
-STARTB: 
+STARTB:
         LD      IX,0            ; Flag cold start
         JP      CSTART          ; Jump to initialise
 
