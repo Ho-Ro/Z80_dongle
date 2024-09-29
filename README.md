@@ -71,25 +71,29 @@ Connected through a serial port, you have several commands available (type `?` o
 at the console):
 
 ```
-  A               - analyse ROM Basic interpreter
-  B               - execute ROM Basic interpreter
-  e0              - set echo off
-  e1              - set echo on (default)
-  s               - show simulation variables
-  s N VALUE       - set simulation variable number N to a VALUE
-  sR              - reset simulation variables to their default values
-  r               - restart the simulation
+  A               - analyse Grant Searle's ROM Basic
+  Ax              - analyse Hein Pragt's ROM Basic
+  B               - execute Grant Searle's ROM Basic
+  Bx              - execute Hein Pragt's ROM Basic
+  #               - show simulation variables
+  #N VALUE        - set simulation variable number N to a VALUE
+  #R              - reset simulation variables to their default values
+  R               - run the simulation from start 0x0000
+  S               - single-step the simulation from start 0x0000
+  C               - continue the simulation after halt
   :INTEL-HEX      - reload RAM buffer with ihex data stream
   .INTEL-HEX      - reload IO buffer with a modified ihex data stream
-  m START END     - dump the RAM buffer from START to END
-  mx START END    - dump the RAM buffer as ihex from START to END
-  mR              - reset the RAM buffer to 00
-  ms ADR B B B .. - set RAM buffer at ADR with data byte(s) B
-  i START END     - dump the IO buffer from START to END
-  ix START END    - dump the IO buffer as modified ihex from START to END
-  iR              - reset the IO buffer to 00
-  is ADR B B B .. - set IO buffer at ADR with data byte(s) B
-  vN              - set verboseMode to N (default = 0)
+  M START END     - dump the RAM buffer from START to END
+  MX START END    - dump the RAM buffer as ihex from START to END
+  MR              - reset the RAM buffer to 00
+  MS ADR B B B .. - set RAM buffer at ADR with data byte(s) B
+  I START END     - dump the IO buffer from START to END
+  IX START END    - dump the IO buffer as modified ihex from START to END
+  IR              - reset the IO buffer to 00
+  IS ADR B B B .. - set IO buffer at ADR with data byte(s) B
+  E0              - set echo off
+  E1              - set echo on (default)
+  VN              - set verboseMode to N (default = 0)
 ```
 
 There are several internal simulation variables that you can change in order to run your tests
@@ -892,4 +896,3 @@ The SW is based on the Nascom Rom Basic:
 
 and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
 The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
-I use parts from the z80retroshield software that emulates ROM, RAM and UART for the Z80.

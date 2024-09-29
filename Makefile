@@ -7,7 +7,6 @@ FQBN = arduino:avr:mega
 PORT = /dev/ttyACM0
 
 INO = $(PRJ)/$(PRJ).ino
-CPP = $(PRJ)/*.cpp
 H = $(PRJ)/*.h
 
 BUILD = $(PRJ)/build/$(subst :,.,$(FQBN))
@@ -15,7 +14,7 @@ BUILD = $(PRJ)/build/$(subst :,.,$(FQBN))
 HEX = $(BUILD)/$(PRJ).ino.hex
 
 
-$(HEX): $(INO) $(CPP) $(H)
+$(HEX): $(INO) $(H) Makefile
 	arduino-cli compile --export-binaries --warnings all --fqbn $(FQBN) $<
 
 
@@ -28,8 +27,4 @@ upload: $(HEX)
 .PHONY: touch
 touch:
 	touch $(INO)
-
-
-o.new: o.cpp
-	g++ -Wall -Wpedantic -o o.new o.cpp
 
