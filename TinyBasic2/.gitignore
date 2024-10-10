@@ -1,0 +1,6 @@
+; do not include the original files
+tinybasic2dms.*
+
+; show the listing as reference
+!tinybasic2dms.lst.pdf
+!tinybasic2.lst
