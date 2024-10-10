@@ -7,23 +7,11 @@
 // * Updates were made by Grant Searle.
 // * Further updates from 8bitforce.
 
-// Read RAM top from RAM (must be set before start of simulation)
-// changed for my dongle:
-//
-// ORIG:
-// 0185 21 43 02    MSIZE:  LD      HL,MEMMSG       ; Point to message
-// 0188 CD 9B 12            CALL    PRS             ; Output "Memory size"
-// ...
-// 01BC 2B          SETTOP: DEC     HL              ; Back one byte
-//
-// NEW:
-// 0185 2A 00 20    MSIZE:  LD      HL,(RAMSTART)   ; Read RAM end from memory
-// 0188 C3 BC 01            JP      SETTOP          ; Skip user input and mem check
-// ...
-// 01BC 2B          SETTOP: DEC     HL              ; Back one byte
-
 PROGMEM const byte rom_gs[] = {
+
 #if 0
+    // code from intmini_orig.asm
+
     // static const unsigned char intmini_data[] =
     /* 0000 */ 0xf3, 0xc3, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00,
 
@@ -78,11 +66,28 @@ PROGMEM const byte rom_gs[] = {
 
 #else
 
+// modified intmini.asm code
 #include "intmini.h"
 
 #endif
 
-    // BASIC starts at 0x150
+// BASIC starts at 0x150
+
+// Read RAM top address from RAM (must be set before start of simulation)
+// changed for my dongle:
+//
+// ORIG:
+// 0185 21 43 02    MSIZE:  LD      HL,MEMMSG       ; Point to message
+// 0188 CD 9B 12            CALL    PRS             ; Output "Memory size"
+// ...
+// 01BC 2B          SETTOP: DEC     HL              ; Back one byte
+//
+// NEW:
+// 0185 2A 00 20    MSIZE:  LD      HL,(RAMSTART)   ; Read RAM end from memory
+// 0188 C3 BC 01            JP      SETTOP          ; Skip user input and mem check
+// ...
+// 01BC 2B          SETTOP: DEC     HL              ; Back one byte
+
 
     0xc3, 0x56, 0x01, 0xc3, 0xf4, 0x01, 0xdd, 0x21, 0x00, 0x00, 0xc3, 0x61, 0x01, 0x07, 0x0a, 0x7d, 0x11, 0x21, 0x45, 0x20, 0xf9,
     0xc3, 0x9c, 0x1d, 0x11, 0x2e, 0x04, 0x06, 0x63, 0x21, 0x45, 0x20, 0x1a, 0x77, 0x23, 0x13, 0x05, 0xc2, 0x70, 0x01, 0xf9, 0xcd,

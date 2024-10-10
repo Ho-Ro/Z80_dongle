@@ -13,28 +13,25 @@
 ;
 ;==================================================================================
 
-; Minimum 6850 ACIA interrupt driven serial I/O to run modified NASCOM Basic 4.7
-; Full input buffering with incoming data hardware handshaking
-; Handshake shows full before the buffer is totally filled to allow run-on from the sender
-
-SER_BUFSIZE     .EQU    3FH
-SER_FULLSIZE    .EQU    30H
-SER_EMPTYSIZE   .EQU    5
-
-serBuf          .EQU    02000H
-serInPtr        .EQU    serBuf+SER_BUFSIZE
-serRdPtr        .EQU    serInPtr+2
-serBufUsed      .EQU    serRdPtr+2
-basicStarted    .EQU    serBufUsed+1
+ramBegin        .EQU    02000H
+basicStarted    .EQU    ramBegin + 2
 TEMPSTACK       .EQU    020EDH          ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+
+; Minimum 6850 ACIA polled serial I/O
+
+DATA6850        .EQU    01H             ; ACIA 6850 Data Register
+STAT6850        .EQU    02H             ; ACIA 6850 Status Register
+
+; Control character
 
 CR              .EQU    0DH
 LF              .EQU    0AH
 CS              .EQU    0CH             ; Clear screen
 
-                .ORG    0000
 ;------------------------------------------------------------------------------
-; Reset
+; Reset - Here we go
+
+                .ORG    0000
 
 RST00:          DI                      ;Disable interrupts
                 JP      INIT            ;Initialize Hardware and go
@@ -45,7 +42,7 @@ RST00:          DI                      ;Disable interrupts
 ; TX a character over RS232
 
                 .ORG    0008H
-RST08:          OUT     (1),A
+RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
                 RET
 
                 .FILL   0010H-$,0       ; Padding so RST10 starts at org 0x0010H
@@ -56,7 +53,7 @@ RST08:          OUT     (1),A
                 .ORG    0010H
 RST10:          RST     $18
                 JR      Z,RST10
-                IN      A,(1)
+                IN      A,(DATA6850)     ; 6850 Receive Data Register
                 RET
 
                 .FILL   0018H-$,0
@@ -65,11 +62,15 @@ RST10:          RST     $18
 ; Check serial status
 
                 .ORG    0018H
-RST18:          IN      A,(2)
-                OR      A
+RST18:          IN      A,(STAT6850)    ; 6850 Status Register
+                OR      A               ; 6850 Receive Data Register Full
                 RET
 
+                .FILL   0020H-$,0
+
 ;------------------------------------------------------------------------------
+; Output string
+                .ORG 0020H
 PRINT:          LD      A,(HL)          ; Get character
                 OR      A               ; Is it $00 ?
                 RET     Z               ; Then RETurn on terminator
@@ -77,18 +78,13 @@ PRINT:          LD      A,(HL)          ; Get character
                 INC     HL              ; Next Character
                 JR      PRINT           ; Continue until $00
                 RET
+
 ;------------------------------------------------------------------------------
+
 INIT:
                 LD      HL,TEMPSTACK    ; Temp stack
                 LD      SP,HL           ; Set up a temporary stack
-                LD      HL,serBuf
-                LD      (serInPtr),HL
-                LD      (serRdPtr),HL
-                XOR     A               ;0 to accumulator
-                LD      (serBufUsed),A
 
-                IM      1               ; Interrupt-mode 1
-                DI                      ; Disable interrupts
                 LD      HL,SIGNON1      ; Sign-on message
                 CALL    PRINT           ; Output string
                 LD      A,(basicStarted); Check the BASIC STARTED flag

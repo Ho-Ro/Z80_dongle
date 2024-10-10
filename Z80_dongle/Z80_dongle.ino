@@ -150,11 +150,15 @@ uint8_t RAM[ ramLen + 2560 ];
 const uint16_t ramMask = 0xFFF;
 
 static uint16_t ramBegin = 0;
+static uint8_t ramBeginHi = 0;
 static uint16_t ramEnd = ramBegin + ramLen - 1;
+static uint8_t ramEndHi = ramEnd >> 8;
 
 const uint16_t romLen = 0x2000;
 static uint16_t romBegin = 0;
+static uint8_t romBeginHi = 0;
 static uint16_t romEnd = romBegin + romLen - 1;
+static uint8_t romEndHi = romEnd >> 8;
 
 uint8_t const *ROM = rom_gs;
 
@@ -185,7 +189,7 @@ uint8_t analyseBasic = 0;
 // Arduino initialization entry point
 // -----------------------------------------------------------
 void setup() {
-    Serial.begin( 1000000 );
+    Serial.begin( 115200 );
     Serial.flush();
     Serial.setTimeout( 1000L * 60 * 60 );
 
@@ -420,27 +424,40 @@ int controlHandler() {
         case 'B':
             // "move" the RAM on top of ROM
             ramBegin = 0x2000;
-            ramEnd = ramBegin + ramLen - 1; // default is 4K size
-            if ( cmd == 'A' ) {             // analyse
-                if ( opt == 'X' ) {         // Hein's Basic
+
+            if ( cmd == 'A' ) { // analyse
+                // signal 4K memory size to Basic
+                ramEnd = ramBegin + ramLen - 1;
+                RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
+                RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
+                if ( opt == 'X' ) { // Hein's Basic
                     ROM = rom_hp;
                     analyseBasic = 'x';
                 } else { // default, Grant's Basic
                     ROM = rom_gs;
                     analyseBasic = 'b';
                 }
+                singleStep = running = true;
+            } else { // run Basic
+                memset( RAM, 0, sizeof( RAM ) );
+                ramEnd = ramBegin + sizeof( RAM ) - 1;
                 // signal memory size to Basic
                 RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                 RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
-                singleStep = running = true;
-            } else {                                                   // 'B'
-                if ( opt == 'X' )                                      // Hein's version
-                    runWithInterrupt( rom_hp, 0x2000, sizeof( RAM ) ); // will never return
-                else                                                   // default, Grants version
-                    runWithInterrupt( rom_gs, 0x2000, sizeof( RAM ) ); // will never return
+                if ( opt == 'X' )                              // Hein's version
+                    runWithInterrupt( 0x2000, sizeof( RAM ) ); // will never return
+                else                                           // default, Grants version
+                    runWithInterrupt( 0x2000, sizeof( RAM ) ); // will never return
             }
             DoReset();
             break;
+
+        case 'X': // execute program from RAM
+            // no ROM, RAM starts at 0x0000
+            ramBegin = 0x0000;
+            ramEnd = ramBegin + sizeof( RAM ) - 1; // full size ram
+            runWithInterrupt( ramBegin, sizeof( RAM ) ); // will never return
+            break; // silence fall-through warning
 
         case 'E':
             if ( opt == '0' )
@@ -465,7 +482,9 @@ int controlHandler() {
             // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
             // If the variable was set, skip reset sequence since we might be testing it.
             ramBegin = 0;
+            ramBeginHi = 0;
             ramEnd = ramBegin + ramLen - 1;
+            ramEndHi = ramEnd >> 8;
             if ( resetAtClk < 0 )
                 DoReset();
             running = singleStep = true;
@@ -651,11 +670,8 @@ int controlHandler() {
             pf( F( "Ax              - analyse Hein Pragt's ROM Basic\r\n" ) );
             pf( F( "B               - execute Grant Searle's ROM Basic\r\n" ) );
             pf( F( "Bx              - execute Hein Pragt's ROM Basic\r\n" ) );
-            pf( F( "#               - show simulation variables\r\n" ) );
-            pf( F( "#N VALUE        - set simulation variable number N to a VALUE\r\n" ) );
-            pf( F( "#R              - reset simulation variables to their default values\r\n" ) );
-            pf( F( "R               - run the simulation from start 0x0000\r\n" ) );
-            pf( F( "S               - single-step the simulation from start 0x0000\r\n" ) );
+            pf( F( "X               - execute the RAM content\r\n" ) );
+            pf( F( "R               - reset CPU, start the simulation at RAM address 0x0000\r\n" ) );
             pf( F( "C               - continue the simulation after halt\r\n" ) );
             pf( F( ":INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
             pf( F( ".INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
@@ -667,6 +683,9 @@ int controlHandler() {
             pf( F( "IX START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
             pf( F( "IR              - reset the IO buffer to 00\r\n" ) );
             pf( F( "IS ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
+            pf( F( "#               - show simulation variables\r\n" ) );
+            pf( F( "#N VALUE        - set simulation variable number N to a VALUE\r\n" ) );
+            pf( F( "#R              - reset simulation variables to their default values\r\n" ) );
             pf( F( "E0              - set echo off\r\n" ) );
             pf( F( "E1              - set echo on (default)\r\n" ) );
             pf( F( "VN              - set verboseMode to N (default = 0)\r\n" ) );
@@ -717,7 +736,8 @@ void loop() {
     // If the address is tri-stated, skip checking various combinations of
     // control signals since they may also be floating and we can't detect that
     if ( !abTristated ) {
-        static bool iowrPrev = 1;
+        static bool ioRdPrev = true;
+        static bool ioWrPrev = true;
         uint8_t data = 0;
         // Simulate read from RAM
         if ( !mreq && !rd ) {
@@ -750,9 +770,21 @@ void loop() {
 
         // Simulate I/O read
         else if ( !iorq && !rd ) {
-            data = IO[ ab & ioMask ];
-            SetDataToDB( data );
-            sprintf( extraInfo, "I/O read from %04X -> %02X", ab, data );
+            static char key = 0;
+            if ( ioRdPrev && ( ( ab & 0xFF ) == 2 ) ) {
+                pf( "KBD: " );
+                while( !Serial.available() )
+                    ;
+                key = Serial.read();
+                if ( key == '!')
+                    key = 0x0D;
+            } else if ( ioRdPrev && ( ( ab & 0xFF ) == 1 ) ) {
+                SetDataToDB( key );
+                key = 0;
+            } else {
+                data = IO[ ab & ioMask ];
+                sprintf( extraInfo, "I/O read from %04X -> %02X", ab, data );
+            }
         }
 
         // Simulate I/O write
@@ -760,8 +792,8 @@ void loop() {
             GetDataFromDB();
             IO[ ab & ioMask ] = db;
             sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-            if ( ( analyseBasic == 'x' && iowrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
-                 ( analyseBasic == 'b' && iowrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
+            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
+                 ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
                 sprintf( extraInfo + strlen( extraInfo ), "  CONOUT: %c", isprint( db ) ? db : ' ' );
         }
 
@@ -772,7 +804,8 @@ void loop() {
 
         else
             GetDataFromDB();
-        iowrPrev = iorq || wr;
+        ioRdPrev = iorq || rd;
+        ioWrPrev = iorq || wr;
     } else
         GetDataFromDB();
 
@@ -918,10 +951,6 @@ int readBytesUntilEOL( char *buf, int maxlen ) {
 // /RD and /WR trigger ATmega interrupts and the ISR stops the Z80 via /WAIT until done
 ///////////////////////////////////////////////////////////////////////////////////////
 
-
-const long fClk = 200000; // Z80 clock speed
-
-
 // Pin defines
 // TODO clean up and unify with Goran's defines on top, have all definitins in one place
 
@@ -980,8 +1009,11 @@ inline void BUSRQ_LOW() { PORTH &= ~( 1 << BUSRQ_PIN_NAME ); }
 inline void BUSRQ_HIGH() { PORTH |= ( 1 << BUSRQ_PIN_NAME ); }
 
 
-void runWithInterrupt( const uint8_t *rom, uint16_t romLen, uint16_t ramLen ) {
-    Serial.begin( 1000000 );
+const long fClk = 100000; // Z80 clock speed
+
+
+void runWithInterrupt( uint16_t romLen, uint16_t ramLen ) {
+    // Serial.begin( 115200 );
     Serial.println( "Start Z80" );
 
     pinMode( A13, INPUT_PULLUP ); // M1
@@ -1040,15 +1072,16 @@ void runWithInterrupt( const uint8_t *rom, uint16_t romLen, uint16_t ramLen ) {
 
     romBegin = 0;
     romEnd = romLen;
-    ROM = rom;
-
     ramBegin = romLen;
     ramEnd = ramBegin + ramLen - 1;
 
-    memset( RAM, 0, ramLen );         // Clear RAM memory
-    RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF; // set for Basic
-    RAM[ 1 ] = ( ramEnd + 1 ) >> 8;   //
+    // values for 8 bit comparison
+    romBeginHi = romBegin >> 8;
+    romEndHi = romEnd >> 8;
+    ramBeginHi = ramBegin >> 8;
+    ramEndHi = ramEnd >> 8;
 
+    delay(1);
     RES_HIGH(); // ready to go
 
     while ( true ) { // background tasks can be done here
@@ -1075,7 +1108,6 @@ inline uint8_t DATA_GET() {
 // ------------------------
 
 inline void DATA_PUT( uint8_t d ) {
-    // WAIT_HIGH();
     DDRL = 0xff; // Set out
     PORTL = d;   // Write
 }
@@ -1087,34 +1119,30 @@ inline void DATA_PUT( uint8_t d ) {
 ISR( INT2_vect ) { // Handle RD
     WAIT_LOW();
     if ( zMREQ ) { // Handle MREQ
-        unsigned int addr = (unsigned int)( ADDR_LO | ( ADDR_HI << 8 ) );
-        if ( addr >= ramBegin ) {                   // 0x20 ) {
-            if ( addr <= ramEnd ) {                 // 0x38 ) {
-                DATA_PUT( RAM[ addr - ramBegin ] ); // RAM
+        if ( ADDR_HI >= ramBeginHi ) {
+            if ( ADDR_HI <= ramEndHi ) {
+                DATA_PUT( RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] ); // RAM
             } else {
-                Serial.print( F( "RD ERROR: " ) );
-                Serial.println( addr, HEX );
+                DATA_PUT( 0 );
             }
         } else {
-            DATA_PUT( pgm_read_byte( ROM + addr ) ); // ROM
+            DATA_PUT( pgm_read_byte( ROM + (uint16_t )( ADDR_LO | ( ADDR_HI << 8 ) ) ) ); // ROM
         }
     } else if ( zIORQ ) {     // Handle IORQ
         if ( ADDR_LO == 1 ) { // Port 1 returns character from keyboard
-            // WAIT_LOW();       // Make wait active because we are slow
             if ( Serial.available() == 0 ) {
                 DATA_PUT( 0 );
             } else {
                 DATA_PUT( (char)Serial.read() );
             }
         } else if ( ADDR_LO == 2 ) { // Port 2 returns a nonzero value if a key has been pressed.
-            // WAIT_LOW();       // Make wait active because we are slow
             if ( Serial.available() > 0 ) {
-                DATA_PUT( 0xff );
+                DATA_PUT( 0x01 );
             } else {
                 DATA_PUT( 0 );
             }
         } else
-            DATA_PUT( 0 ); // Otherwise, it returns 0.
+            DATA_PUT( 0 ); // Otherwise, it returns 0
     }
     WAIT_HIGH();
 }
@@ -1127,16 +1155,8 @@ ISR( INT2_vect ) { // Handle RD
 ISR( INT3_vect ) { // Handle WR
     WAIT_LOW();
     if ( zMREQ ) { // Handle MREQ
-        unsigned int addr = (unsigned int)( ADDR_LO | ( ADDR_HI << 8 ) );
-        unsigned char byte = DATA_GET();
-        if ( addr > ramEnd ) { // 0x38 ) {
-            Serial.print( F( "WR ERROR: " ) );
-            Serial.println( addr, HEX );
-        } else if ( addr < ramBegin ) { // 0x20 ) {
-            Serial.print( F( "Write ROM: " ) );
-            Serial.println( addr, HEX );
-        } else {
-            RAM[ addr - ramBegin ] = byte; // Can only write into RAM
+        if ( ADDR_HI >= ramBeginHi && ADDR_HI <= ramEndHi ) {
+            RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] = DATA_GET(); // Can only write into RAM
         }
     } else if ( zIORQ ) { // Handle IORQ
         if ( ADDR_LO == 1 ) {

@@ -1,11 +1,10 @@
+# create include file from intmini.asm
 
-
-
-../Z80_dongle/intmini.h: intmini.obj bin2h
-	./bin2h > $@
+../Z80_dongle/intmini.h: intmini.obj obj2h
+	./obj2h > $@
 
 intmini.obj: intmini.asm
 	uz80as $<
 
-bin2h: bin2h.cpp
+obj2h: obj2h.cpp
 	gcc -Wall -o $@ $<

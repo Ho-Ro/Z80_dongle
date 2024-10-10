@@ -5,6 +5,7 @@
 *.new
 *.old
 *.orig
+*.work
 
 *.bin
 *.z80
