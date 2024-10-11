@@ -8,7 +8,7 @@ PORT = /dev/ttyACM0
 
 
 INO = $(PRJ)/$(PRJ).ino
-ASM = Basic_GS/intmini.asm
+ASM = Basic_GS/intmini.asm TinyBasic2/tinybasic2.asm
 
 BUILD = $(PRJ)/build/$(subst :,.,$(FQBN))
 

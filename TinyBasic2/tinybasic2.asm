@@ -4,6 +4,16 @@
 ;Status bit for write in OUTC (actually OC3) changed to 0x01
 ;Changed UART initialization parameters in INIT
 ;Changed ORG statements at end of file to match system with 2K RAM
+;2024-10-11 Ho-Ro:
+;Modified for use with Z80 dongle simulator
+;UART data port 1
+;UART status port 2
+;New:
+;Case insensitive input
+;PEEK and DEEK
+;PRINT modifier for hex out: PRINT %16,..
+;Hex numbers: $xxxx
+
 ;*************************************************************
 ; 
 ;                 TINY BASIC FOR INTEL 8080
@@ -30,20 +40,15 @@
 ; SECTION.  THEY CAN BE REACHED ONLY BY 3-BYTE CALLS.
 ; 
 
-;DWA     MACRO WHERE
-;        DB   (WHERE SHR 8) + 128
-;        DB   WHERE AND 0FFH
-;        ENDM
-;
-
 ; Memory map
 ROMBGN  .EQU $0000      ; Execution must start here
 RAMBGN  .EQU $0800      ; 2K ROM
-RAMSZE  .EQU $0800      ; 2K RAM
+RAMSZE  .EQU $1800      ; 6K RAM
 
 ; IO map
 IODATA  .EQU 1
 IOSTAT  .EQU 2
+IO_RX_BIT .EQU $01
 
 ; Control character
 BS      .EQU 08H        ; ^H, BACKSPACE
@@ -1489,7 +1494,7 @@ OC1:    MVI  A,LF                       ;YES, WE SEND LF TOO
         RET
 
 CHKIO:  IN   IOSTAT                     ;*** CHKIO ***
-        ANI  1H                         ;MASK STATUS BIT
+        ANI  IO_RX_BIT                  ;MASK STATUS BIT
         RZ                              ;NOT READY, RETURN "Z"
         IN   IODATA                     ;READY, READ DATA
         ANI  7FH                        ;MASK BIT 7 OFF

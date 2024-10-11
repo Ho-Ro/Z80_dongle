@@ -1,5 +1,6 @@
 ; do not include the original files
 tinybasic2dms.*
+obj2h
 
 ; show the listing as reference
 !tinybasic2dms.lst.pdf

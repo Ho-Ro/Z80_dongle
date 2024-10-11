@@ -42,6 +42,8 @@
 // Hein Pragt's Basic ROM
 #include "NascomBasic_HP.h"
 
+//  Li Chen Wang's Tiny Basic ROM
+#include "TinyBasic2.h"
 
 // TODO: unify this stuff with the Hein Pagt setup at the end of this source code
 // Define Arduino Mega pins that are connected to a Z80 dongle board.
@@ -418,25 +420,30 @@ int controlHandler() {
         char cmd = toupper( input[ 0 ] );
         char opt = toupper( input[ 1 ] );
         switch ( cmd ) {
-        // this entry selects one of the two Basic setups
-        // either for analysis (A, B) or execution (G, H)
+        // this entry selects one of the three Basic setups
+        // either for analysis (A) or execution (B)
         case 'A':
         case 'B':
             // "move" the RAM on top of ROM
-            ramBegin = 0x2000;
+            if ( opt == 'X' ) { // Hein's Basic
+                ROM = rom_hp;
+                ramBegin = 0x2000;
+                analyseBasic = 'x';
+            } else if ( opt == 'T' ) { // Tiny Basic
+                ROM = rom_tb2;
+                ramBegin = 0x0800;
+                analyseBasic = 't';
+            } else { // default, Grant's Basic
+                ROM = rom_gs;
+                ramBegin = 0x2000;
+                analyseBasic = 'b';
+            }
 
             if ( cmd == 'A' ) { // analyse
                 // signal 4K memory size to Basic
                 ramEnd = ramBegin + ramLen - 1;
                 RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                 RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
-                if ( opt == 'X' ) { // Hein's Basic
-                    ROM = rom_hp;
-                    analyseBasic = 'x';
-                } else { // default, Grant's Basic
-                    ROM = rom_gs;
-                    analyseBasic = 'b';
-                }
                 singleStep = running = true;
             } else { // run Basic
                 memset( RAM, 0, sizeof( RAM ) );
@@ -444,8 +451,8 @@ int controlHandler() {
                 // signal memory size to Basic
                 RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                 RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
-                if ( opt == 'X' )                              // Hein's version
-                    runWithInterrupt( 0x2000, sizeof( RAM ) ); // will never return
+                if ( opt == 'T' )                              // Tiny Basic
+                    runWithInterrupt( 0x800, sizeof( RAM ) );  // will never return
                 else                                           // default, Grants version
                     runWithInterrupt( 0x2000, sizeof( RAM ) ); // will never return
             }
