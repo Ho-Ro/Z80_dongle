@@ -74,19 +74,19 @@ RTSTC  .EQU 1                          ;*** RST 1 @ $0008 ***
 CRLF:   MVI  A,CR                       ;*** CRLF ***
 ;
 ROUTC   .EQU 2                          ;*** RST 2 @ $0010 ***
-OUTC:   PUSH PSW
-        LDA  OCSW                       ;PRINT CHARACTER ONLY
-        ORA  A                          ;IF OCSW SWITCH IS ON
-        JMP  OC2                        ;REST OF THIS IS AT OC2
+OUTC:   OUT  IODATA                     ;Out to data port
+        CPI  CR                         ;WAS IT CR?
+        RNZ                             ;NO, FINISHED
+        JMP  OC1                        ;REST OF THIS IS AT OC1
 
 REXPR   .EQU 3                          ;*** RST 3 @ $0018 ***
-        CALL EXPR2
+EXPR:   CALL EXPR2
         PUSH H                          ;EVALUATE AN EXPRESSION
         JMP  EXPR1                      ;REST OF IT AT EXPR1
         .DB  "W"
 
 RCOMP   .EQU 4                          ;*** RST 4 @ $0020 ***
-        MOV  A,H
+COMP:   MOV  A,H
         CMP  D                          ;COMPARE HL WITH DE
         RNZ                             ;RETURN CORRECT C AND
         MOV  A,L                        ;Z FLAGS
@@ -95,20 +95,20 @@ RCOMP   .EQU 4                          ;*** RST 4 @ $0020 ***
         .DB  "AN"
 
 RIGNBLK .EQU 5                          ;*** RST 5 @ $0028 ***
-SS1:    LDAX D
+IGNBLK: LDAX D
         CPI  20H                        ;IGNORE BLANKS
         RNZ                             ;IN TEXT (WHERE DE->)
         INX  D                          ;AND RETURN THE FIRST
-        JMP  SS1                        ;NON-BLANK CHAR. IN A
+        JMP  IGNBLK                     ;NON-BLANK CHAR. IN A
 
 RFINISH .EQU 6                          ;*** RST 6 @ $0030 ***
-        POP  PSW
+FINISH: POP  PSW
         CALL FIN                        ;CHECK END OF COMMAND
         JMP  QWHAT                      ;PRINT "WHAT?" IF WRONG
         .DB  "G"
 
 RTSTV   .EQU 7                          ;*** RST 7 @ $0038 ***
-        RST  RIGNBLK                    ;IGNBLK
+TSTV:   RST  RIGNBLK                    ;IGNBLK
         SUI  40H                        ;TEST VARIABLES
         RC                              ;C:NOT A VARIABLE
         JNZ  TV1                        ;NOT "@" ARRAY
@@ -123,7 +123,7 @@ RTSTV   .EQU 7                          ;*** RST 7 @ $0038 ***
         JC   ASORRY                     ;IF SO, SAY "SORRY"
         LXI  H,VARBGN                   ;IF NOT GET ADDRESS
         CALL SUBDE                      ;OF @(EXPR) AND PUT IT
-        POP  D                          ;IN HL
+        POP  D                          ;IN HL (top-down from TXTEND)
         RET                             ;C FLAG IS CLEARED
 ;
 TV1:    CPI  21H                        ;>='a'?
@@ -161,21 +161,23 @@ TC2:    INX  D                          ;IF =, SKIP THOSE BYTES
 TSTNUM: LXI  H,0                        ;*** TSTNUM ***
         MOV  B,H                        ;TEST IF THE TEXT IS
         RST  RIGNBLK                    ;A NUMBER
-TN1:    CPI  30H                        ;IF NOT, RETURN 0 IN
+        CPI  '$'                        ;HEX NUMBER?
+        JZ   TX1                        ;YES
+TN1:    CPI  '0'                        ;IF NOT, RETURN 0 IN
         RC                              ;B AND HL
-        CPI  3AH                        ;IF NUMBERS, CONVERT
+        CPI  '9'+1                      ;IF NUMBERS, CONVERT
         RNC                             ;TO BINARY IN HL AND
         MVI  A,0F0H                     ;SET B TO # OF DIGITS
-        ANA  H                          ;IF H>255, THERE IS NO
+        ANA  H                          ;IF H>15, THERE IS NO
         JNZ  QHOW                       ;ROOM FOR NEXT DIGIT
         INR  B                          ;B COUNTS # OF DIGITS
         PUSH B
         MOV  B,H                        ;HL=10*HL+(NEW DIGIT)
         MOV  C,L
-        DAD  H                          ;WHERE 10* IS DONE BY
-        DAD  H                          ;SHIFT AND ADD
-        DAD  B
-        DAD  H
+        DAD  H                          ; 2*HL
+        DAD  H                          ; 4*HL
+        DAD  B                          ; 5*HL
+        DAD  H                          ;10*HL
         LDAX D                          ;AND (DIGIT) IS FROM
         INX  D                          ;STRIPPING THE ASCII
         ANI  0FH                        ;CODE
@@ -187,6 +189,38 @@ TN1:    CPI  30H                        ;IF NOT, RETURN 0 IN
         POP  B
         LDAX D                          ;DO THIS DIGIT AFTER
         JP   TN1                        ;DIGIT. S SAYS OVERFLOW
+
+TX1:    INX  D                          ;SKIP TO NEXT HEX
+        LDAX D                          ;GET HEX DIGIT
+        CPI  '0'                        ;< '0'
+        RC                              ;ERROR
+        CPI  '9'+1                      ;<= '9'
+        JC   TX2                        ;OK '0'..'9'
+        CPI  'A'                        ;< 'A'
+        RC                              ;ERROR, >'9' && < 'A'
+        ANI  5FH                        ;CONVERT ALPHA TO UPPER
+        CPI  'F'+1                      ;> 'F'
+        RNC                             ;ERROR
+        SUI  'A'-'0'-10                 ;SKIP GAP '9' -> 'A'
+TX2:    ANI  0FH                        ;GET HEX CODE 0..F
+        PUSH B
+        MOV  B,A                        ;SAVE HEX CODE
+        MVI  A,0F0H                     ;IF H>15
+        ANA  H                          ;THERE IS NO ROOM
+        MOV  A,B
+        POP  B
+        JNZ  QHOW                       ;FOR NEXT DIGIT
+
+        INR  B                          ;B COUNTS # OF DIGITS
+        DAD  H                          ;2*HL
+        DAD  H                          ;4*HL
+        DAD  H                          ;8*HL
+        DAD  H                          ;16*HL
+        ORA  L                          ;PUT HEX CODE INTO
+        MOV  L,A                        ;THE 4 LSB OF HL
+        ;MOV  A,H
+        ;ORA  A
+        JMP  TX1                        ;DIGIT AFTER DIGIT
 
 QHOW:   PUSH D                          ;*** ERROR "HOW?" ***
 AHOW:   LXI  D,HOW
@@ -418,10 +452,10 @@ PR0:    TSTC('#',PR5)                   ;ELSE IS IT FORMAT?
         RST  REXPR                      ;YES, EVALUATE EXPR.
         MOV  C,L                        ;AND SAVE IT IN C
         JMP  PR3                        ;LOOK FOR MORE TO PRINT
-PR5:    TSTC('$',PR1)                   ;ELSE IS IT PRTNUM BASE?
+PR5:    TSTC('%',PR1)                   ;ELSE IS IT PRTNUM BASE?
         RST  REXPR                      ;YES, EVALUATE EXPR.
-        MOV  A,L                        ;AND STORE IT IN PNBASE
-        STA  PNBASE
+        MOV  A,L                        ;AND STORE THE LOW PART
+        STA  PNBASE                     ;IN PNBASE
         JMP  PR3                        ;LOOK FOR MORE TO PRINT
 PR1:    CALL QTSTG                      ;OR IS IT A STRING?
         JMP  PR8                        ;IF NOT, MUST BE EXPR.
@@ -1413,17 +1447,16 @@ PUSHA:  LXI  H,STKLMT                   ;*** PUSHA ***
 PU1:    PUSH H
         PUSH B                          ;BC = RETURN ADDR.
         RET
-;
+
 ;*************************************************************
 ;
-; *** OUTC *** & CHKIO ***
+; *** OUTC *** CHKIO ***
 ;
 ; THESE ARE THE ONLY I/O ROUTINES IN TBI.
-; 'OUTC' IS CONTROLLED BY A SOFTWARE SWITCH 'OCSW'.  IF OCSW=0
-; 'OUTC' WILL JUST RETURN TO THE CALLER.  IF OCSW IS NOT 0,
-; IT WILL OUTPUT THE BYTE IN A.  IF THAT IS A CR, A LF IS ALSO
-; SEND OUT.  ONLY THE FLAGS MAY BE CHANGED AT RETURN. ALL REG.
-; ARE RESTORED.
+; OUTC WILL OUTPUT THE BYTE IN A.
+; IF THAT IS A CR, A LF IS ALSO SEND OUT.
+; ONLY THE FLAGS MAY BE CHANGED AT RETURN.
+; ALL REGISTERS ARE RESTORED.
 ;
 ; 'CHKIO' CHECKS THE INPUT.  IF NO INPUT, IT WILL RETURN TO
 ; THE CALLER WITH THE Z FLAG SET.  IF THERE IS INPUT, Z FLAG
@@ -1432,10 +1465,8 @@ PU1:    PUSH H
 ; Z FLAG IS RETURNED.  IF A CONTROL-C IS READ, 'CHKIO' WILL
 ; RESTART TBI AND DO NOT RETURN TO THE CALLER.
 ;
-INIT:   STA  OCSW
-        MVI  D,30                       ;30 new lines to clear screen
-PATLOP:
-        CALL CRLF
+INIT:   MVI  D,30                       ;30 new lines to clear screen
+PATLOP: CALL CRLF
         DCR  D
         JNZ  PATLOP
         SUB  A
@@ -1447,18 +1478,12 @@ PATLOP:
         SHLD TXTUNF
         JMP  RSTART
 
-;OUTC:  PUSH PSW                        ;THIS IS AT LOC. 10
-;       LDA  OCSW                       ;CHECK SOFTWARE SWITCH
-;       ORA  A
-;       JP   OC2
-OC2:    JNZ  OC3                        ;IT IS ON
-        POP  PSW                        ;IT IS OFF
-        RET                             ;RESTORE AF AND RETURN
-OC3:    POP  PSW                        ;READY, GET OLD A BACK
-        OUT  IODATA                     ;Out to data port
-        CPI  CR                         ;WAS IT CR?
-        RNZ                             ;NO, FINISHED
-        MVI  A,LF                       ;YES, WE SEND LF TOO
+;THIS IS AT LOC. 10
+;OUTC:  OUT  IODATA                     ;Out to data port
+;       CPI  CR                         ;WAS IT CR?
+;       RNZ                             ;NO, FINISHED
+;       JMP  OC1                        ;REST OF THIS IS AT OC1
+OC1:    MVI  A,LF                       ;YES, WE SEND LF TOO
         RST  ROUTC                      ;THIS IS RECURSIVE
         MVI  A,CR                       ;GET CR BACK IN A
         RET
@@ -1468,21 +1493,13 @@ CHKIO:  IN   IOSTAT                     ;*** CHKIO ***
         RZ                              ;NOT READY, RETURN "Z"
         IN   IODATA                     ;READY, READ DATA
         ANI  7FH                        ;MASK BIT 7 OFF
-CI0:    CPI  0FH                        ;IS IT CONTROL-O?
-        JNZ  CI1                        ;NO, MORE CHECKING
-        LDA  OCSW                       ;CONTROL-O FLIPS OCSW
-        CMA                             ;ON TO OFF, OFF TO ON
-        STA  OCSW
-        JMP  CHKIO                      ;GET ANOTHER INPUT
-CI1:    CPI  03H                        ;IS IT CONTROL-C?
+CI0:    CPI  03H                        ;IS IT CONTROL-C?
         RNZ                             ;NO, RETURN "NZ"
         JMP  RSTART                     ;YES, RESTART TBI
 ;
-MSG1:   .DB  "Tiny "
-        .DB  "BASIC "
-        .DB  "V 2.0"
+MSG1:   .DB  "TinyBASIC"
         .DB  CR
-;
+
 ;*************************************************************
 ;
 ; *** TABLES *** DIRECT *** & EXEC ***
@@ -1624,16 +1641,19 @@ EX5:    MOV  A,M                        ;LOAD HL WITH THE JUMP
         ANI  7FH                        ;MASK OFF HIGH ADDRESS BIT
 #ENDIF
         MOV  H,A
-        POP  PSW                        ;CLEAN UP THE GABAGE
+        POP  PSW                        ;CLEAN UP THE GARBAGE
         PCHL                            ;AND WE GO DO IT
 ;
 LSTROM:                                 ;ALL ABOVE CAN BE ROM
+;
+;*************************************************************
 
-;       .ORG 1000H
+;*************************************************************
+;
         .ORG RAMBGN                     ;HERE DOWN MUST BE RAM
 ;
-OCSW:   .DS  1                          ;SWITCH FOR OUTPUT
 PNBASE: .DS  1                          ;BASE FOR PRTNUM
+OCSW:   .DS  1                          ;SWITCH FOR OUTPUT
 CURRNT: .DS  2                          ;POINTS TO CURRENT LINE
 STKGOS: .DS  2                          ;SAVES SP IN 'GOSUB'
 VARNXT: .DS  2                          ;TEMP STORAGE
@@ -1647,19 +1667,18 @@ RANPNT: .DS  2                          ;RANDOM NUMBER POINTER
 TXTUNF: .DS  2                          ;->UNFILLED TEXT AREA
 TXTBGN: .EQU $                          ;TEXT SAVE AREA BEGINS
 
-;       .ORG 1366H
-;       .ORG 1F00H
-;       .ORG 0F00H                      ;for 2K RAM
         .ORG RAMBGN + RAMSZE - $0100
+;
 TXTEND: .EQU $                          ;TEXT SAVE AREA ENDS
-VARBGN: .DS  55                         ;VARIABLE '@(0)' FOLLOWED BY 'A'..'Z'
+VARBGN: .DS  2+2*26                     ;VARIABLE '@(0)' FOLLOWED BY 'A'..'Z'
+                                        ;'@(1), @(2), ... are stored top-down
+                                        ;i.e. &@(i) = TXTEND-2*i
 BUFFER: .DS  64                         ;INPUT BUFFER
 BUFEND: .DS  1                          ;BUFFER ENDS
 STKLMT: .DS  1                          ;TOP LIMIT FOR STACK
-;       .ORG 1400H
-;       .ORG 2000H
-        .ORG 1000H                      ;for 4K system -- 2k ROM, 2K RAM
+
         .ORG RAMBGN + RAMSZE
+;
 STACK:  .EQU $                          ;STACK STARTS HERE
 ;
         .END
