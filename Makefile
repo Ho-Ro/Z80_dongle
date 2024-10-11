@@ -19,6 +19,7 @@ INC = $(PRJ)/*.h
 
 $(HEX): $(INO) $(ASM) $(INC) Makefile
 	make -C Basic_GS
+	make -C TinyBasic2
 	arduino-cli compile --export-binaries --warnings all --fqbn $(FQBN) $<
 
 

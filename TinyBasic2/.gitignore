@@ -1,7 +1,7 @@
-; do not include the original files
+#do not include the original files
 tinybasic2dms.*
 obj2h
 
-; show the listing as reference
+# show the listing as reference
 !tinybasic2dms.lst.pdf
 !tinybasic2.lst

@@ -45,6 +45,7 @@
 //  Li Chen Wang's Tiny Basic ROM
 #include "TinyBasic2.h"
 
+
 // TODO: unify this stuff with the Hein Pagt setup at the end of this source code
 // Define Arduino Mega pins that are connected to a Z80 dongle board.
 
@@ -675,8 +676,10 @@ int controlHandler() {
             // Print help
             pf( F( "A               - analyse Grant Searle's ROM Basic\r\n" ) );
             pf( F( "Ax              - analyse Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "At              - analyse Li Chen Wang's tiny ROM Basic\r\n" ) );
             pf( F( "B               - execute Grant Searle's ROM Basic\r\n" ) );
             pf( F( "Bx              - execute Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "Bt              - execute Li Chen Wang's tiny ROM Basic\r\n" ) );
             pf( F( "X               - execute the RAM content\r\n" ) );
             pf( F( "R               - reset CPU, start the simulation at RAM address 0x0000\r\n" ) );
             pf( F( "C               - continue the simulation after halt\r\n" ) );
