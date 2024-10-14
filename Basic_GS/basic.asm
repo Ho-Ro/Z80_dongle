@@ -372,7 +372,7 @@ WORDTB: .DW     PEND
         .DW     DEF
         .DW     POKE
         .DW     DOKE
-        .DW     REM
+        .DW     REM             ;SCREEN
         .DW     LINES
         .DW     CLS
         .DW     WIDTH
@@ -383,8 +383,8 @@ WORDTB: .DW     PEND
         .DW     CONT
         .DW     LIST
         .DW     CLEAR
-        .DW     REM
-        .DW     REM
+        .DW     REM             ;CLOAD
+        .DW     REM             ;CSAVE
         .DW     NEW
 
 ; RESERVED WORD TOKEN VALUES

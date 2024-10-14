@@ -7,9 +7,13 @@
 int main( int argc, char *argv[] ) {
     FILE *in;
     uint8_t rom[ romsize ] = {0};
-    in = fopen( "tinybasic2.obj", "rb" );
+    if( argc < 2 ) {
+        fprintf( stderr, "usage: obj2h <OBJFILE>\n" );
+        return -1;
+    }
+    in = fopen( argv[1], "rb" );
     if( !in ) {
-        fprintf( stderr, "error\n" );
+        fprintf( stderr, "error: cannot open %s\n", argv[1] );
         return -1;
     }
     fread( rom, 1, sizeof( rom ), in );
