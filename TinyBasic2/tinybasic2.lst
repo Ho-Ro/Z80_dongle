@@ -84,7 +84,7 @@
 0084   0000             
 0085   0000 31 00 18    START:          LD      SP,STACK        ;*** COLD START ***
 0086   0003 3E FF                       LD      A,0FFH
-0087   0005 C3 DA 06                    JP      INIT
+0087   0005 C3 DF 06                    JP      INIT
 0088   0008             
 0089   0008             RTSTC           .EQU    $       ;*** RST 1 @ $0008 ***
 0090   0008 E3                          EX      (SP),HL
@@ -98,12 +98,12 @@
 0098   0010 D3 01       OUTC:           OUT     (IODATA),A      ;Out to data port
 0099   0012 FE 0D                       CP      CR      ;WAS IT CR?
 0100   0014 C0                          RET     NZ      ;NO, FINISHED
-0101   0015 C3 EF 06                    JP      OC1     ;REST OF THIS IS AT OC1
+0101   0015 C3 F4 06                    JP      OC1     ;REST OF THIS IS AT OC1
 0102   0018             
 0103   0018             REXPR           .EQU    $       ;*** RST 3 @ $0018 ***
-0104   0018 CD B9 03    EXPR:           CALL    EXPR2
+0104   0018 CD BE 03    EXPR:           CALL    EXPR2
 0105   001B E5                          PUSH    HL      ;EVALUATE AN EXPRESSION
-0106   001C C3 75 03                    JP      EXPR1   ;REST OF IT AT EXPR1
+0106   001C C3 7A 03                    JP      EXPR1   ;REST OF IT AT EXPR1
 0107   001F 57          .DB             "W"
 0108   0020             
 0109   0020             RCOMP           .EQU    $       ;*** RST 4 @ $0020 ***
@@ -124,8 +124,8 @@
 0124   0030             
 0125   0030             RFINISH         .EQU    $       ;*** RST 6 @ $0030 ***
 0126   0030 F1          FINISH:         POP     AF
-0127   0031 CD 14 05                    CALL    FIN     ;CHECK END OF COMMAND
-0128   0034 C3 27 05                    JP      QWHAT   ;PRINT "WHAT?" IF WRONG
+0127   0031 CD 19 05                    CALL    FIN     ;CHECK END OF COMMAND
+0128   0034 C3 2C 05                    JP      QWHAT   ;PRINT "WHAT?" IF WRONG
 0129   0037 47          .DB             "G"
 0130   0038             
 0131   0038             RTSTV           .EQU    $       ;*** RST 7 @ $0038 ***
@@ -134,16 +134,16 @@
 0134   003B D8                          RET     C       ;C: < '@', NOT A VARIABLE
 0135   003C C2 58 00                    JP      NZ,TV1  ;NZ: NOT THE '@' ARRAY
 0136   003F 13                          INC     DE      ;IT IS THE "@" ARRAY
-0137   0040 CD 62 04                    CALL    PARN    ;@ SHOULD BE FOLLOWED
+0137   0040 CD 67 04                    CALL    PARN    ;@ SHOULD BE FOLLOWED
 0138   0043 29                          ADD     HL,HL   ;BY (EXPR) AS ITS INDEX
 0139   0044 DA D5 00                    JP      C,QHOW  ;IS INDEX TOO BIG (>0x7FFF)?
 0140   0047 D5                          PUSH    DE      ;WILL IT OVERWRITE
 0141   0048 EB                          EX      DE,HL   ;TEXT?
-0142   0049 CD A1 04                    CALL    FREE    ;FIND SIZE OF FREE RAM
+0142   0049 CD A6 04                    CALL    FREE    ;FIND SIZE OF FREE RAM
 0143   004C E7                          RST     RCOMP   ;AND CHECK THAT
-0144   004D DA 55 05                    JP      C,ASORRY        ;IF SO, SAY "SORRY"
+0144   004D DA 5A 05                    JP      C,ASORRY        ;IF SO, SAY "SORRY"
 0145   0050 21 00 17                    LD      HL,ARRBGN       ;IF NOT GET ADDRESS
-0146   0053 CD DA 04                    CALL    SUBDE   ;OF @(EXPR) AND PUT IT
+0146   0053 CD DF 04                    CALL    SUBDE   ;OF @(EXPR) AND PUT IT
 0147   0056 D1                          POP     DE      ;IN HL (top-down from TXTEND)
 0148   0057 C9                          RET             ;C FLAG IS CLEARED
 0149   0058             ;
@@ -246,7 +246,7 @@
 0246   00D5             
 0247   00D5 D5          QHOW:           PUSH    DE      ;*** ERROR "HOW?" ***
 0248   00D6 11 DC 00    AHOW:           LD      DE,HOW
-0249   00D9 C3 2B 05                    JP      ERROR
+0249   00D9 C3 30 05                    JP      ERROR
 0250   00DC             
 0251   00DC 48 4F 57 3F HOW:            .DB             "HOW?"
 0252   00E0 0D          .DB             CR
@@ -298,14 +298,14 @@
 0296   00F3 CD 0E 00    ST1:            CALL    CRLF    ;AND JUMP TO HERE
 0297   00F6 11 E1 00                    LD      DE,OK   ;DE->STRING
 0298   00F9 97                          SUB     A       ;A=0
-0299   00FA CD CC 05                    CALL    PRTSTG  ;PRINT STRING UNTIL CR
+0299   00FA CD D1 05                    CALL    PRTSTG  ;PRINT STRING UNTIL CR
 0300   00FD 21 04 01                    LD      HL,ST2+1        ;LITERAL 0
 0301   0100 22 3A 17                    LD      (CURRNT),HL     ;CURRENT->LINE # = 0
 0302   0103 21 00 00    ST2:            LD      HL,0
 0303   0106 22 42 17                    LD      (LOPVAR),HL
 0304   0109 22 3C 17                    LD      (STKGOS),HL
 0305   010C 3E 3E       ST3:            LD      A,'>'   ;PROMPT '>' AND
-0306   010E CD 5B 05                    CALL    GETLN   ;READ A LINE
+0306   010E CD 60 05                    CALL    GETLN   ;READ A LINE
 0307   0111 D5                          PUSH    DE      ;DE->END OF LINE
 0308   0112 11 4E 17                    LD      DE,BUFFER       ;DE->BEGINNING OF LINE
 0309   0115 CD 7E 00                    CALL    TSTNUM  ;TEST IF IT IS A NUMBER
@@ -313,7 +313,7 @@
 0311   0119 7C                          LD      A,H     ;HL=VALUE OF THE # OR
 0312   011A B5                          OR      L       ;0 IF NO # WAS FOUND
 0313   011B C1                          POP     BC      ;BC->END OF LINE
-0314   011C CA BA 07                    JP      Z,DIRECT
+0314   011C CA BF 07                    JP      Z,DIRECT
 0315   011F 1B                          DEC     DE      ;BACKUP DE AND SAVE
 0316   0120 7C                          LD      A,H     ;VALUE OF LINE # THERE
 0317   0121 12                          LD      (DE),A
@@ -325,15 +325,15 @@
 0323   0127 79                          LD      A,C
 0324   0128 93                          SUB     E
 0325   0129 F5                          PUSH    AF      ;A=# OF BYTES IN LINE
-0326   012A CD A4 05                    CALL    FNDLN   ;FIND THIS LINE IN SAVE
+0326   012A CD A9 05                    CALL    FNDLN   ;FIND THIS LINE IN SAVE
 0327   012D D5                          PUSH    DE      ;AREA, DE->SAVE AREA
 0328   012E C2 41 01                    JP      NZ,ST4  ;NZ:NOT FOUND, INSERT
 0329   0131 D5                          PUSH    DE      ;Z:FOUND, DELETE IT
-0330   0132 CD C0 05                    CALL    FNDNXT  ;FIND NEXT LINE
+0330   0132 CD C5 05                    CALL    FNDNXT  ;FIND NEXT LINE
 0331   0135                                             ;DE->NEXT LINE
 0332   0135 C1                          POP     BC      ;BC->LINE TO BE DELETED
 0333   0136 2A 38 17                    LD      HL,(TXTUNF)     ;HL->UNFILLED SAVE AREA
-0334   0139 CD 7D 06                    CALL    MVUP    ;MOVE UP TO DELETE
+0334   0139 CD 82 06                    CALL    MVUP    ;MOVE UP TO DELETE
 0335   013C 60                          LD      H,B     ;TXTUNF->UNFILLED AREA
 0336   013D 69                          LD      L,C
 0337   013E 22 38 17                    LD      (TXTUNF),HL     ;UPDATE
@@ -350,13 +350,13 @@
 0348   0151 67                          LD      H,A     ;HL->NEW UNFILLED AREA
 0349   0152 11 00 17                    LD      DE,TXTEND       ;CHECK TO SEE IF THERE
 0350   0155 E7                          RST     RCOMP   ;COMP HL,DE - IS ENOUGH SPACE
-0351   0156 D2 54 05                    JP      NC,QSORRY       ;SORRY, NO ROOM FOR IT
+0351   0156 D2 59 05                    JP      NC,QSORRY       ;SORRY, NO ROOM FOR IT
 0352   0159 22 38 17                    LD      (TXTUNF),HL     ;OK, UPDATE TXTUNF
 0353   015C D1                          POP     DE      ;DE->OLD UNFILLED AREA
-0354   015D CD 86 06                    CALL    MVDOWN
+0354   015D CD 8B 06                    CALL    MVDOWN
 0355   0160 D1                          POP     DE      ;DE->BEGIN, HL->END
 0356   0161 E1                          POP     HL
-0357   0162 CD 7D 06                    CALL    MVUP    ;MOVE NEW LINE TO SAVE
+0357   0162 CD 82 06                    CALL    MVUP    ;MOVE NEW LINE TO SAVE
 0358   0165 C3 0C 01                    JP      ST3     ;AREA
 0359   0168             
 0360   0168             ;*************************************************************
@@ -394,18 +394,18 @@
 0392   0168             ; 'GOTO EXPR(CR)' EVALUATES THE EXPRESSION, FIND THE TARGET
 0393   0168             ; LINE, AND JUMP TO 'RUNTSL' TO DO IT.
 0394   0168             ;
-0395   0168 CD 23 05    NEW:            CALL    ENDCHK  ;*** NEW(CR) ***
+0395   0168 CD 28 05    NEW:            CALL    ENDCHK  ;*** NEW(CR) ***
 0396   016B 21 00 08                    LD      HL,TXTBGN
 0397   016E 22 38 17                    LD      (TXTUNF),HL
 0398   0171             ;
-0399   0171 CD 23 05    STOP:           CALL    ENDCHK  ;*** STOP(CR) ***
+0399   0171 CD 28 05    STOP:           CALL    ENDCHK  ;*** STOP(CR) ***
 0400   0174 C3 F0 00                    JP      RSTART
 0401   0177             
-0402   0177 CD 23 05    RUN:            CALL    ENDCHK  ;*** RUN(CR) ***
+0402   0177 CD 28 05    RUN:            CALL    ENDCHK  ;*** RUN(CR) ***
 0403   017A 11 00 08                    LD      DE,TXTBGN       ;FIRST SAVED LINE
 0404   017D             ;
 0405   017D 21 00 00    RUNNXL:         LD      HL,0    ;*** RUNNXL ***
-0406   0180 CD AC 05                    CALL    FNDLP   ;FIND WHATEVER LINE #
+0406   0180 CD B1 05                    CALL    FNDLP   ;FIND WHATEVER LINE #
 0407   0183 DA F0 00                    JP      C,RSTART        ;C:PASSED TXTUNF, QUIT
 0408   0186             ;
 0409   0186 EB          RUNTSL:         EX      DE,HL   ;*** RUNTSL ***
@@ -414,14 +414,14 @@
 0412   018B 13                          INC     DE      ;BUMP PASS LINE #
 0413   018C 13                          INC     DE
 0414   018D             ;
-0415   018D CD F5 06    RUNSML:         CALL    CHKIO   ;*** RUNSML ***
-0416   0190 21 1D 07                    LD      HL,TAB2-1       ;FIND COMMAND IN TAB2
-0417   0193 C3 BD 07                    JP      EXEC    ;AND EXECUTE IT
+0415   018D CD FA 06    RUNSML:         CALL    CHKIO   ;*** RUNSML ***
+0416   0190 21 22 07                    LD      HL,TAB2-1       ;FIND COMMAND IN TAB2
+0417   0193 C3 C2 07                    JP      EXEC    ;AND EXECUTE IT
 0418   0196             
 0419   0196 DF          GOTO:           RST     REXPR   ;*** GOTO EXPR ***
 0420   0197 D5                          PUSH    DE      ;SAVE FOR ERROR ROUTINE
-0421   0198 CD 23 05                    CALL    ENDCHK  ;MUST FIND A CR
-0422   019B CD A4 05                    CALL    FNDLN   ;FIND THE TARGET LINE
+0421   0198 CD 28 05                    CALL    ENDCHK  ;MUST FIND A CR
+0422   019B CD A9 05                    CALL    FNDLN   ;FIND THE TARGET LINE
 0423   019E C2 D6 00                    JP      NZ,AHOW ;NO SUCH LINE #
 0424   01A1 F1                          POP     AF      ;CLEAR THE PUSH DE
 0425   01A2 C3 86 01                    JP      RUNTSL  ;GO DO IT
@@ -455,12 +455,12 @@
 0453   01A5             ; ENDED WITH A COMMA, NO (CRLF) IS GENERATED.
 0454   01A5             ;
 0455   01A5 CD 7E 00    LIST:           CALL    TSTNUM  ;TEST IF THERE IS A #
-0456   01A8 CD 23 05                    CALL    ENDCHK  ;IF NO # WE GET A 0
-0457   01AB CD A4 05                    CALL    FNDLN   ;FIND THIS OR NEXT LINE
+0456   01A8 CD 28 05                    CALL    ENDCHK  ;IF NO # WE GET A 0
+0457   01AB CD A9 05                    CALL    FNDLN   ;FIND THIS OR NEXT LINE
 0458   01AE DA F0 00    LS1:            JP      C,RSTART        ;C:PASSED TXTUNF
-0459   01B1 CD 65 06                    CALL    PRTLN   ;PRINT THE LINE
-0460   01B4 CD F5 06                    CALL    CHKIO   ;STOP IF HIT CONTROL-C
-0461   01B7 CD AC 05                    CALL    FNDLP   ;FIND NEXT LINE
+0459   01B1 CD 6A 06                    CALL    PRTLN   ;PRINT THE LINE
+0460   01B4 CD FA 06                    CALL    CHKIO   ;STOP IF HIT CONTROL-C
+0461   01B7 CD B1 05                    CALL    FNDLP   ;FIND NEXT LINE
 0462   01BA C3 AE 01                    JP      LS1     ;AND LOOP BACK
 0463   01BD             
 0464   01BD 0E 08       PRINT:          LD      C,8     ;C = # OF SPACES
@@ -481,1352 +481,1355 @@
 0473   01D8 05          
 0474   01D9 DF                          RST     REXPR   ;YES, EVALUATE EXPR.
 0475   01DA 4D                          LD      C,L     ;AND SAVE IT IN C
-0476   01DB C3 EF 01                    JP      PR3     ;LOOK FOR MORE TO PRINT
+0476   01DB C3 F4 01                    JP      PR3     ;LOOK FOR MORE TO PRINT
 0477   01DE CF          PR5:            TSTC('%',PR1)   ;ELSE IS IT PRTNUM BASE?
 0477   01DF 25          
-0477   01E0 08          
+0477   01E0 0D          
 0478   01E1 DF                          RST     REXPR   ;YES, EVALUATE EXPR.
 0479   01E2 7D                          LD      A,L     ;AND STORE THE LOW PART
-0480   01E3 32 37 17                    LD      (PNBASE),A      ;IN PNBASE
-0481   01E6 C3 EF 01                    JP      PR3     ;LOOK FOR MORE TO PRINT
-0482   01E9 CD D8 05    PR1:            CALL    QTSTG   ;OR IS IT A STRING?
-0483   01EC C3 01 02                    JP      PR8     ;IF NOT, MUST BE EXPR.
-0484   01EF CF          PR3:            TSTC($2C,PR6)   ;IF ",", GO FIND NEXT
-0484   01F0 2C          
-0484   01F1 06          
-0485   01F2 CD 14 05                    CALL    FIN     ;IN THE LIST.
-0486   01F5 C3 D6 01                    JP      PR0     ;LIST CONTINUES
-0487   01F8 3E 0A       PR6:            LD      A,10    ;END OF LIST REACHED
-0488   01FA 32 37 17                    LD      (PNBASE),A      ;RESET DEFAULT BASE
-0489   01FD CD 0E 00                    CALL    CRLF    ;LIST ENDS WITH CRLF
-0490   0200 F7                          RST     RFINISH ;FINISH
-0491   0201 DF          PR8:            RST     REXPR   ;EVALUATE THE EXPR
-0492   0202 C5                          PUSH    BC
-0493   0203 CD 0B 06                    CALL    PRTNUM  ;PRINT THE VALUE
-0494   0206 C1                          POP     BC
-0495   0207 C3 EF 01                    JP      PR3     ;MORE TO PRINT?
-0496   020A             ;
-0497   020A             ;*************************************************************
-0498   020A             ;
-0499   020A             ; *** GOSUB *** & RETURN ***
-0500   020A             ;
-0501   020A             ; 'GOSUB EXPR;' OR 'GOSUB EXPR (CR)' IS LIKE THE 'GOTO'
-0502   020A             ; COMMAND, EXCEPT THAT THE CURRENT TEXT POINTER, STACK POINTER
-0503   020A             ; ETC. ARE SAVE SO THAT EXECUTION CAN BE CONTINUED AFTER THE
-0504   020A             ; SUBROUTINE 'RETURN'.  IN ORDER THAT 'GOSUB' CAN BE NESTED
-0505   020A             ; (AND EVEN RECURSIVE), THE SAVE AREA MUST BE STACKED.
-0506   020A             ; THE STACK POINTER IS SAVED IN 'STKGOS', THE OLD 'STKGOS' IS
-0507   020A             ; SAVED IN THE STACK.  IF WE ARE IN THE MAIN ROUTINE, 'STKGOS'
-0508   020A             ; IS ZERO (THIS WAS DONE BY THE "MAIN" SECTION OF THE CODE),
-0509   020A             ; BUT WE STILL SAVE IT AS A FLAG FOR NO FURTHER 'RETURN'S.
-0510   020A             ;
-0511   020A             ; 'RETURN(CR)' UNDOS EVERYTHING THAT 'GOSUB' DID, AND THUS
-0512   020A             ; RETURN THE EXECUTION TO THE COMMAND AFTER THE MOST RECENT
-0513   020A             ; 'GOSUB'.  IF 'STKGOS' IS ZERO, IT INDICATES THAT WE
-0514   020A             ; NEVER HAD A 'GOSUB' AND IS THUS AN ERROR.
-0515   020A             ;
-0516   020A CD B1 06    GOSUB:          CALL    PUSHA   ;SAVE THE CURRENT "FOR"
-0517   020D DF                          RST     REXPR   ;PARAMETERS
-0518   020E D5                          PUSH    DE      ;AND TEXT POINTER
-0519   020F CD A4 05                    CALL    FNDLN   ;FIND THE TARGET LINE
-0520   0212 C2 D6 00                    JP      NZ,AHOW ;NOT THERE. SAY "HOW?"
-0521   0215 2A 3A 17                    LD      HL,(CURRNT)     ;FOUND IT, SAVE OLD
-0522   0218 E5                          PUSH    HL      ;'CURRNT' OLD 'STKGOS'
-0523   0219 2A 3C 17                    LD      HL,(STKGOS)
-0524   021C E5                          PUSH    HL
-0525   021D 21 00 00                    LD      HL,0    ;AND LOAD NEW ONES
-0526   0220 22 42 17                    LD      (LOPVAR),HL
-0527   0223 39                          ADD     HL,SP
-0528   0224 22 3C 17                    LD      (STKGOS),HL
-0529   0227 C3 86 01                    JP      RUNTSL  ;THEN RUN THAT LINE
-0530   022A CD 23 05    RETURN:         CALL    ENDCHK  ;THERE MUST BE A CR
-0531   022D 2A 3C 17                    LD      HL,(STKGOS)     ;OLD STACK POINTER
-0532   0230 7C                          LD      A,H     ;0 MEANS NOT EXIST
-0533   0231 B5                          OR      L
-0534   0232 CA 27 05                    JP      Z,QWHAT ;SO, WE SAY: "WHAT?"
-0535   0235 F9                          LD      SP,HL   ;ELSE, RESTORE IT
-0536   0236 E1                          POP     HL
-0537   0237 22 3C 17                    LD      (STKGOS),HL     ;AND THE OLD 'STKGOS'
-0538   023A E1                          POP     HL
-0539   023B 22 3A 17                    LD      (CURRNT),HL     ;AND THE OLD 'CURRNT'
-0540   023E D1                          POP     DE      ;OLD TEXT POINTER
-0541   023F CD 95 06                    CALL    POPA    ;OLD "FOR" PARAMETERS
-0542   0242 F7                          RST     RFINISH ;AND WE ARE BACK HOME
-0543   0243             ;
-0544   0243             ;*************************************************************
-0545   0243             ;
-0546   0243             ; *** FOR *** & NEXT ***
-0547   0243             ;
-0548   0243             ; 'FOR' HAS TWO FORMS:
-0549   0243             ; 'FOR VAR=EXP1 TO EXP2 STEP EXP3' AND 'FOR VAR=EXP1 TO EXP2'
-0550   0243             ; THE SECOND FORM MEANS THE SAME THING AS THE FIRST FORM WITH
-0551   0243             ; EXP3=1.  (I.E., WITH A STEP OF +1.)
-0552   0243             ; TBI WILL FIND THE VARIABLE VAR, AND SET ITS VALUE TO THE
-0553   0243             ; CURRENT VALUE OF EXP1.  IT ALSO EVALUATES EXP2 AND EXP3
-0554   0243             ; AND SAVE ALL THESE TOGETHER WITH THE TEXT POINTER ETC. IN
-0555   0243             ; THE 'FOR' SAVE AREA, WHICH CONSISTS OF 'LOPVAR', 'LOPINC',
-0556   0243             ; 'LOPLMT', 'LOPLN', AND 'LOPPT'.  IF THERE IS ALREADY SOME-
-0557   0243             ; THING IN THE SAVE AREA (THIS IS INDICATED BY A NON-ZERO
-0558   0243             ; 'LOPVAR'), THEN THE OLD SAVE AREA IS SAVED IN THE STACK
-0559   0243             ; BEFORE THE NEW ONE OVERWRITES IT.
-0560   0243             ; TBI WILL THEN DIG IN THE STACK AND FIND OUT IF THIS SAME
-0561   0243             ; VARIABLE WAS USED IN ANOTHER CURRENTLY ACTIVE 'FOR' LOOP.
-0562   0243             ; IF THAT IS THE CASE, THEN THE OLD 'FOR' LOOP IS DEACTIVATED.
-0563   0243             ; (PURGED FROM THE STACK..)
-0564   0243             ;
-0565   0243             ; 'NEXT VAR' SERVES AS THE LOGICAL (NOT NECESSARILLY PHYSICAL)
-0566   0243             ; END OF THE 'FOR' LOOP.  THE CONTROL VARIABLE VAR. IS CHECKED
-0567   0243             ; WITH THE 'LOPVAR'.  IF THEY ARE NOT THE SAME, TBI DIGS IN
-0568   0243             ; THE STACK TO FIND THE RIGHT ONE AND PURGES ALL THOSE THAT
-0569   0243             ; DID NOT MATCH.  EITHER WAY, TBI THEN ADDS THE 'STEP' TO
-0570   0243             ; THAT VARIABLE AND CHECK THE RESULT WITH THE LIMIT.  IF IT
-0571   0243             ; IS WITHIN THE LIMIT, CONTROL LOOPS BACK TO THE COMMAND
-0572   0243             ; FOLLOWING THE 'FOR'.  IF OUTSIDE THE LIMIT, THE SAVE AREA
-0573   0243             ; IS PURGED AND EXECUTION CONTINUES.
-0574   0243             ;
-0575   0243 CD B1 06    FOR:            CALL    PUSHA           ;SAVE THE OLD SAVE AREA
-0576   0246 CD 01 05                    CALL    SETVAL          ;SET THE CONTROL VAR.
-0577   0249 2B                          DEC     HL              ;HL IS ITS ADDRESS
-0578   024A 22 42 17                    LD      (LOPVAR),HL     ;SAVE THAT
-0579   024D 21 8D 07                    LD      HL,TAB5-1       ;USE 'EXEC' TO LOOK
-0580   0250 C3 BD 07                    JP      EXEC            ;FOR THE WORD 'TO'
-0581   0253 DF          FR1:            RST     REXPR           ;EVALUATE THE LIMIT
-0582   0254 22 46 17                    LD      (LOPLMT),HL     ;SAVE THAT
-0583   0257 21 93 07                    LD      HL,TAB6-1       ;USE 'EXEC' TO LOOK
-0584   025A C3 BD 07                    JP      EXEC            ;FOR THE WORD 'STEP'
-0585   025D DF          FR2:            RST     REXPR           ;FOUND IT, GET STEP
-0586   025E C3 64 02                    JP      FR4
-0587   0261 21 01 00    FR3:            LD      HL,1H           ;NOT FOUND, SET TO 1
-0588   0264 22 44 17    FR4:            LD      (LOPINC),HL     ;SAVE THAT TOO
-0589   0267 2A 3A 17    FR5:            LD      HL,(CURRNT)     ;SAVE CURRENT LINE #
-0590   026A 22 48 17                    LD      (LOPLN),HL
-0591   026D EB                          EX      DE,HL           ;AND TEXT POINTER
-0592   026E 22 4A 17                    LD      (LOPPT),HL
-0593   0271 01 0A 00                    LD      BC,0AH          ;DIG INTO STACK TO
-0594   0274 2A 42 17                    LD      HL,(LOPVAR)     ;FIND 'LOPVAR'
-0595   0277 EB                          EX      DE,HL
-0596   0278 60                          LD      H,B
-0597   0279 68                          LD      L,B             ;HL=0 NOW
-0598   027A 39                          ADD     HL,SP           ;HERE IS THE STACK
-0599   027B 3E                          .DB     3EH             ;SKIP "ADD HL,BC"
-0600   027C 09          FR7:            ADD     HL,BC           ;EACH LEVEL IS 10 DEEP
-0601   027D 7E                          LD      A,(HL)          ;GET THAT OLD 'LOPVAR'
-0602   027E 23                          INC     HL
-0603   027F B6                          OR      (HL)
-0604   0280 CA 9D 02                    JP      Z,FR8           ;0 SAYS NO MORE IN IT
-0605   0283 7E                          LD      A,(HL)
-0606   0284 2B                          DEC     HL
-0607   0285 BA                          CP      D               ;SAME AS THIS ONE?
-0608   0286 C2 7C 02                    JP      NZ,FR7
-0609   0289 7E                          LD      A,(HL)          ;THE OTHER HALF?
-0610   028A BB                          CP      E
-0611   028B C2 7C 02                    JP      NZ,FR7
-0612   028E EB                          EX      DE,HL           ;YES, FOUND ONE
-0613   028F 21 00 00                    LD      HL,0H
-0614   0292 39                          ADD     HL,SP           ;TRY TO MOVE SP
-0615   0293 44                          LD      B,H
-0616   0294 4D                          LD      C,L
-0617   0295 21 0A 00                    LD      HL,0AH
-0618   0298 19                          ADD     HL,DE
-0619   0299 CD 86 06                    CALL    MVDOWN          ;AND PURGE 10 WORDS
-0620   029C F9                          LD      SP,HL           ;IN THE STACK
-0621   029D 2A 4A 17    FR8:            LD      HL,(LOPPT)      ;JOB DONE, RESTORE DE
-0622   02A0 EB                          EX      DE,HL
-0623   02A1 F7                          RST     RFINISH         ;AND CONTINUE
-0624   02A2             ;
-0625   02A2 FF          NEXT:           RST     RTSTV           ;GET ADDRESS OF VAR.
-0626   02A3 DA 27 05                    JP      C,QWHAT         ;NO VARIABLE, "WHAT?"
-0627   02A6 22 3E 17                    LD      (VARNXT),HL     ;YES, SAVE IT
-0628   02A9 D5          NX0:            PUSH    DE              ;SAVE TEXT POINTER
-0629   02AA EB                          EX      DE,HL
-0630   02AB 2A 42 17                    LD      HL,(LOPVAR)     ;GET VAR. IN 'FOR'
-0631   02AE 7C                          LD      A,H
-0632   02AF B5                          OR      L               ;0 SAYS NEVER HAD ONE
-0633   02B0 CA 28 05                    JP      Z,AWHAT         ;SO WE ASK: "WHAT?"
-0634   02B3 E7                          RST     RCOMP           ;ELSE WE CHECK THEM
-0635   02B4 CA C1 02                    JP      Z,NX3           ;OK, THEY AGREE
-0636   02B7 D1                          POP     DE              ;NO, LET'S SEE
-0637   02B8 CD 95 06                    CALL    POPA            ;PURGE CURRENT LOOP
-0638   02BB 2A 3E 17                    LD      HL,(VARNXT)     ;AND POP ONE LEVEL
-0639   02BE C3 A9 02                    JP      NX0             ;GO CHECK AGAIN
-0640   02C1 5E          NX3:            LD      E,(HL)          ;COME HERE WHEN AGREED
-0641   02C2 23                          INC     HL
-0642   02C3 56                          LD      D,(HL)          ;DE=VALUE OF VAR.
-0643   02C4 2A 44 17                    LD      HL,(LOPINC)
-0644   02C7 E5                          PUSH    HL
-0645   02C8 7C                          LD      A,H
-0646   02C9 AA                          XOR     D
-0647   02CA 7A                          LD      A,D
-0648   02CB 19                          ADD     HL,DE           ;ADD ONE STEP
-0649   02CC FA D3 02                    JP      M,NX4
-0650   02CF AC                          XOR     H
-0651   02D0 FA F5 02                    JP      M,NX5
-0652   02D3 EB          NX4:            EX      DE,HL
-0653   02D4 2A 42 17                    LD      HL,(LOPVAR)     ;PUT IT BACK
-0654   02D7 73                          LD      (HL),E
-0655   02D8 23                          INC     HL
-0656   02D9 72                          LD      (HL),D
-0657   02DA 2A 46 17                    LD      HL,(LOPLMT)     ;HL->LIMIT
-0658   02DD F1                          POP     AF              ;OLD HL
-0659   02DE B7                          OR      A
-0660   02DF F2 E3 02                    JP      P,NX1           ;STEP > 0
-0661   02E2 EB                          EX      DE,HL           ;STEP < 0
-0662   02E3 CD F9 04    NX1:            CALL    CKHLDE          ;COMPARE WITH LIMIT
-0663   02E6 D1                          POP     DE              ;RESTORE TEXT POINTER
-0664   02E7 DA F7 02                    JP      C,NX2           ;OUTSIDE LIMIT
-0665   02EA 2A 48 17                    LD      HL,(LOPLN)      ;WITHIN LIMIT, GO
-0666   02ED 22 3A 17                    LD      (CURRNT),HL     ;BACK TO THE SAVED
-0667   02F0 2A 4A 17                    LD      HL,(LOPPT)      ;'CURRNT' AND TEXT
-0668   02F3 EB                          EX      DE,HL           ;POINTER
-0669   02F4 F7                          RST     RFINISH
-0670   02F5 E1          NX5:            POP     HL
-0671   02F6 D1                          POP     DE
-0672   02F7 CD 95 06    NX2:            CALL    POPA            ;PURGE THIS LOOP
-0673   02FA F7                          RST     RFINISH
-0674   02FB             ;
-0675   02FB             ;*************************************************************
-0676   02FB             ;
-0677   02FB             ; *** REM *** IF *** INPUT *** & LET (& DEFLT) ***
-0678   02FB             ;
-0679   02FB             ; 'REM' CAN BE FOLLOWED BY ANYTHING AND IS IGNORED BY TBI.
-0680   02FB             ; TBI TREATS IT LIKE AN 'IF' WITH A FALSE CONDITION.
-0681   02FB             ;
-0682   02FB             ; 'IF' IS FOLLOWED BY AN EXPR. AS A CONDITION AND ONE OR MORE
-0683   02FB             ; COMMANDS (INCLUDING OTHER 'IF'S) SEPERATED BY SEMI-COLONS.
-0684   02FB             ; NOTE THAT THE WORD 'THEN' IS NOT USED.  TBI EVALUATES THE
-0685   02FB             ; EXPR. IF IT IS NON-ZERO, EXECUTION CONTINUES.  IF THE
-0686   02FB             ; EXPR. IS ZERO, THE COMMANDS THAT FOLLOWS ARE IGNORED AND
-0687   02FB             ; EXECUTION CONTINUES AT THE NEXT LINE.
-0688   02FB             ;
-0689   02FB             ; 'INPUT' COMMAND IS LIKE THE 'PRINT' COMMAND, AND IS FOLLOWED
-0690   02FB             ; BY A LIST OF ITEMS.  IF THE ITEM IS A STRING IN SINGLE OR
-0691   02FB             ; DOUBLE QUOTES, OR IS A BACK-ARROW, IT HAS THE SAME EFFECT AS
-0692   02FB             ; IN 'PRINT'.  IF AN ITEM IS A VARIABLE, THIS VARIABLE NAME IS
-0693   02FB             ; PRINTED OUT FOLLOWED BY A COLON.  THEN TBI WAITS FOR AN
-0694   02FB             ; EXPR. TO BE TYPED IN.  THE VARIABLE IS THEN SET TO THE
-0695   02FB             ; VALUE OF THIS EXPR.  IF THE VARIABLE IS PROCEDED BY A STRING
-0696   02FB             ; (AGAIN IN SINGLE OR DOUBLE QUOTES), THE STRING WILL BE
-0697   02FB             ; PRINTED FOLLOWED BY A COLON.  TBI THEN WAITS FOR INPUT EXPR.
-0698   02FB             ; AND SET THE VARIABLE TO THE VALUE OF THE EXPR.
-0699   02FB             ;
-0700   02FB             ; IF THE INPUT EXPR. IS INVALID, TBI WILL PRINT "WHAT?",
-0701   02FB             ; "HOW?" OR "SORRY" AND REPRINT THE PROMPT AND REDO THE INPUT.
-0702   02FB             ; THE EXECUTION WILL NOT TERMINATE UNLESS YOU TYPE CONTROL-C.
-0703   02FB             ; THIS IS HANDLED IN 'INPERR'.
-0704   02FB             ;
-0705   02FB             ; 'LET' IS FOLLOWED BY A LIST OF ITEMS SEPERATED BY COMMAS.
-0706   02FB             ; EACH ITEM CONSISTS OF A VARIABLE, AN EQUAL SIGN, AND AN EXPR.
-0707   02FB             ; TBI EVALUATES THE EXPR. AND SET THE VARIABLE TO THAT VALUE.
-0708   02FB             ; TBI WILL ALSO HANDLE 'LET' COMMAND WITHOUT THE WORD 'LET'.
-0709   02FB             ; THIS IS DONE BY 'DEFLT'.
-0710   02FB             ;
-0711   02FB 21 00 00    REM:            LD      HL,0H   ;*** REM ***
-0712   02FE 3E          .DB             3EH             ;SKIP RST, THIS IS LIKE 'IF 0'
-0713   02FF             ;
-0714   02FF DF          IFF:            RST     REXPR   ;*** IF ***
-0715   0300 7C                          LD      A,H     ;IS THE EXPR.=0?
-0716   0301 B5                          OR      L
-0717   0302 C2 8D 01                    JP      NZ,RUNSML       ;NO, CONTINUE
-0718   0305 CD C2 05                    CALL    FNDSKP  ;YES, SKIP REST OF LINE
-0719   0308 D2 86 01                    JP      NC,RUNTSL       ;AND RUN THE NEXT LINE
-0720   030B C3 F0 00                    JP      RSTART  ;IF NO NEXT, RE-START
-0721   030E             ;
-0722   030E 2A 40 17    INPERR:         LD      HL,(STKINP)     ;*** INPERR ***
-0723   0311 F9                          LD      SP,HL   ;RESTORE OLD SP
-0724   0312 E1                          POP     HL      ;AND OLD 'CURRNT'
-0725   0313 22 3A 17                    LD      (CURRNT),HL
-0726   0316 D1                          POP     DE      ;AND OLD TEXT POINTER
-0727   0317 D1                          POP     DE      ;REDO INPUT
-0728   0318             ;
-0729   0318             INPUT:          ;*** INPUT ***
-0730   0318 D5          IP1:            PUSH    DE      ;SAVE IN CASE OF ERROR
-0731   0319 CD D8 05                    CALL    QTSTG   ;IS NEXT ITEM A STRING?
-0732   031C C3 26 03                    JP      IP2     ;NO
-0733   031F FF                          RST     RTSTV   ;YES, BUT FOLLOWED BY A
-0734   0320 DA 5D 03                    JP      C,IP4   ;VARIABLE?   NO.
-0735   0323 C3 36 03                    JP      IP3     ;YES.  INPUT VARIABLE
-0736   0326 D5          IP2:            PUSH    DE      ;SAVE FOR 'PRTSTG'
-0737   0327 FF                          RST     RTSTV   ;MUST BE VARIABLE NOW
-0738   0328 DA 27 05                    JP      C,QWHAT ;"WHAT?" IT IS NOT?
-0739   032B 1A                          LD      A,(DE)  ;GET READY FOR 'PRTSTG'
-0740   032C 4F                          LD      C,A
-0741   032D 97                          SUB     A
-0742   032E 12                          LD      (DE),A
-0743   032F D1                          POP     DE
-0744   0330 CD CC 05                    CALL    PRTSTG  ;PRINT STRING AS PROMPT
-0745   0333 79                          LD      A,C     ;RESTORE TEXT
-0746   0334 1B                          DEC     DE
-0747   0335 12                          LD      (DE),A
-0748   0336 D5          IP3:            PUSH    DE      ;SAVE TEXT POINTER
-0749   0337 EB                          EX      DE,HL
-0750   0338 2A 3A 17                    LD      HL,(CURRNT)     ;ALSO SAVE 'CURRNT'
-0751   033B E5                          PUSH    HL
-0752   033C 21 18 03                    LD      HL,IP1  ;A NEGATIVE NUMBER
-0753   033F 22 3A 17                    LD      (CURRNT),HL     ;AS A FLAG
-0754   0342 21 00 00                    LD      HL,0H   ;SAVE SP TOO
-0755   0345 39                          ADD     HL,SP
-0756   0346 22 40 17                    LD      (STKINP),HL
-0757   0349 D5                          PUSH    DE      ;OLD HL
-0758   034A 3E 3A                       LD      A,':'   ;PRINT THIS TOO
-0759   034C CD 5B 05                    CALL    GETLN   ;AND GET A LINE
-0760   034F 11 4E 17                    LD      DE,BUFFER       ;POINTS TO BUFFER
-0761   0352 DF                          RST     REXPR   ;EVALUATE INPUT
-0762   0353             ;NOP                             ;CAN BE 'CALL ENDCHK'
-0763   0353             ;NOP
-0764   0353             ;NOP
-0765   0353 D1                          POP     DE      ;OK, GET OLD HL
-0766   0354 EB                          EX      DE,HL
-0767   0355 73                          LD      (HL),E  ;SAVE VALUE IN VAR.
-0768   0356 23                          INC     HL
-0769   0357 72                          LD      (HL),D
-0770   0358 E1                          POP     HL      ;GET OLD 'CURRNT'
-0771   0359 22 3A 17                    LD      (CURRNT),HL
-0772   035C D1                          POP     DE      ;AND OLD TEXT POINTER
-0773   035D F1          IP4:            POP     AF      ;PURGE JUNK IN STACK
-0774   035E CF                          TSTC($2C,IP5)   ;IS NEXT CH. ','?
-0774   035F 2C          
-0774   0360 03          
-0775   0361 C3 18 03                    JP      IP1     ;YES, MORE ITEMS.
-0776   0364 F7          IP5:            RST     RFINISH
-0777   0365             ;
-0778   0365 1A          DEFLT:          LD      A,(DE)  ;***  DEFLT ***
-0779   0366 FE 0D                       CP      CR      ;EMPTY LINE IS OK
-0780   0368 CA 74 03                    JP      Z,LT1   ;ELSE IT IS 'LET'
-0781   036B             ;
-0782   036B CD 01 05    LET:            CALL    SETVAL  ;*** LET ***
-0783   036E CF                          TSTC($2C,LT1)   ;SET VALUE TO VAR.
-0783   036F 2C          
-0783   0370 03          
-0784   0371 C3 6B 03                    JP      LET     ;ITEM BY ITEM
-0785   0374 F7          LT1:            RST     RFINISH ;UNTIL FINISH
-0786   0375             ;
-0787   0375             ;*************************************************************
-0788   0375             ;
-0789   0375             ; *** EXPR ***
-0790   0375             ;
-0791   0375             ; 'EXPR' EVALUATES ARITHMETICAL OR LOGICAL EXPRESSIONS.
-0792   0375             ; <EXPR>::<EXPR2>
-0793   0375             ;         <EXPR2><REL.OP.><EXPR2>
-0794   0375             ; WHERE <REL.OP.> IS ONE OF THE OPERATORS IN TAB8 AND THE
-0795   0375             ; RESULT OF THESE OPERATIONS IS 1 IF TRUE AND 0 IF FALSE.
-0796   0375             ; <EXPR2>::=(+ OR -)<EXPR3>(+ OR -<EXPR3>)(....)
-0797   0375             ; WHERE () ARE OPTIONAL AND (....) ARE OPTIONAL REPEATS.
-0798   0375             ; <EXPR3>::=<EXPR4>(* OR /><EXPR4>)(....)
-0799   0375             ; <EXPR4>::=<VARIABLE>
-0800   0375             ;           <FUNCTION>
-0801   0375             ;           (<EXPR>)
-0802   0375             ; <EXPR> IS RECURSIVE SO THAT VARIABLE '@' CAN HAVE AN <EXPR>
-0803   0375             ; AS INDEX, FUNCTIONS CAN HAVE AN <EXPR> AS ARGUMENTS, AND
-0804   0375             ; <EXPR4> CAN BE AN <EXPR> IN PARANTHESE.
-0805   0375             ;
-0806   0375             ;EXPR:          CALL    EXPR2   ;THIS IS AT LOC. 18
-0807   0375             ;               PUSH    HL      ;SAVE <EXPR2> VALUE
-0808   0375             ;               JP      EXPR1   ;REST OF IT AT EXPR1
-0809   0375 21 9B 07    EXPR1:          LD      HL,TAB8-1       ;LOOKUP REL.OP.
-0810   0378 C3 BD 07                    JP      EXEC    ;GO DO IT
-0811   037B             ;
-0812   037B CD A4 03    XP11:           CALL    XP18    ;REL.OP.">="
-0813   037E D8                          RET     C       ;NO, RETURN HL=0
-0814   037F 6F                          LD      L,A     ;YES, RETURN HL=1
-0815   0380 C9                          RET
-0816   0381             ;
-0817   0381 CD A4 03    XP12:           CALL    XP18    ;REL.OP."#"
-0818   0384 C8                          RET     Z       ;FALSE, RETURN HL=0
-0819   0385 6F                          LD      L,A     ;TRUE, RETURN HL=1
-0820   0386 C9                          RET
-0821   0387             ;
-0822   0387 CD A4 03    XP13:           CALL    XP18    ;REL.OP.">"
-0823   038A C8                          RET     Z       ;FALSE
-0824   038B D8                          RET     C       ;ALSO FALSE, HL=0
-0825   038C 6F                          LD      L,A     ;TRUE, HL=1
-0826   038D C9                          RET
-0827   038E             ;
-0828   038E CD A4 03    XP14:           CALL    XP18    ;REL.OP."<="
-0829   0391 6F                          LD      L,A     ;SET HL=1
-0830   0392 C8                          RET     Z       ;REL. TRUE, RETURN
-0831   0393 D8                          RET     C
-0832   0394 6C                          LD      L,H     ;ELSE SET HL=0
-0833   0395 C9                          RET
-0834   0396             ;
-0835   0396 CD A4 03    XP15:           CALL    XP18    ;REL.OP."="
-0836   0399 C0                          RET     NZ      ;FALSE, RETURN HL=0
-0837   039A 6F                          LD      L,A     ;ELSE SET HL=1
-0838   039B C9                          RET
-0839   039C             ;
-0840   039C CD A4 03    XP16:           CALL    XP18    ;REL.OP."<"
-0841   039F D0                          RET     NC      ;FALSE, RETURN HL=0
-0842   03A0 6F                          LD      L,A     ;ELSE SET HL=1
-0843   03A1 C9                          RET
-0844   03A2             ;
-0845   03A2 E1          XP17:           POP     HL      ;NOT .REL.OP
-0846   03A3 C9                          RET             ;RETURN HL=<EXPR2>
-0847   03A4             ;
-0848   03A4 79          XP18:           LD      A,C     ;SUBROUTINE FOR ALL
-0849   03A5 E1                          POP     HL      ;REL.OP.'S
-0850   03A6 C1                          POP     BC
-0851   03A7 E5                          PUSH    HL      ;REVERSE TOP OF STACK
-0852   03A8 C5                          PUSH    BC
-0853   03A9 4F                          LD      C,A
-0854   03AA CD B9 03                    CALL    EXPR2   ;GET 2ND <EXPR2>
-0855   03AD EB                          EX      DE,HL   ;VALUE IN DE NOW
-0856   03AE E3                          EX      (SP),HL ;1ST <EXPR2> IN HL
-0857   03AF CD F9 04                    CALL    CKHLDE  ;COMPARE 1ST WITH 2ND
-0858   03B2 D1                          POP     DE      ;RESTORE TEXT POINTER
-0859   03B3 21 00 00                    LD      HL,0H   ;SET HL=0, A=1
-0860   03B6 3E 01                       LD      A,1
-0861   03B8 C9                          RET
-0862   03B9             ;
-0863   03B9 CF          EXPR2:          TSTC('-',XP21)  ;NEGATIVE SIGN?
-0863   03BA 2D          
-0863   03BB 06          
-0864   03BC 21 00 00                    LD      HL,0H   ;YES, FAKE '0-'
-0865   03BF C3 E3 03                    JP      XP26    ;TREAT LIKE SUBTRACT
-0866   03C2             ;
-0867   03C2 CF          XP21:           TSTC('+',XP22)  ;POSITIVE SIGN? IGNORE
-0867   03C3 2B          
-0867   03C4 00          
-0868   03C5 CD ED 03    XP22:           CALL    EXPR3   ;1ST <EXPR3>
-0869   03C8 CF          XP23:           TSTC('+',XP25)  ;ADD?
-0869   03C9 2B          
-0869   03CA 15          
-0870   03CB E5                          PUSH    HL      ;YES, SAVE VALUE
-0871   03CC CD ED 03                    CALL    EXPR3   ;GET 2ND <EXPR3>
-0872   03CF EB          XP24:           EX      DE,HL   ;2ND IN DE
-0873   03D0 E3                          EX      (SP),HL ;1ST IN HL
-0874   03D1 7C                          LD      A,H     ;COMPARE SIGN
-0875   03D2 AA                          XOR     D
-0876   03D3 7A                          LD      A,D
-0877   03D4 19                          ADD     HL,DE
-0878   03D5 D1                          POP     DE      ;RESTORE TEXT POINTER
-0879   03D6 FA C8 03                    JP      M,XP23  ;1ST AND 2ND SIGN DIFFER
-0880   03D9 AC                          XOR     H       ;1ST AND 2ND SIGN EQUAL
-0881   03DA F2 C8 03                    JP      P,XP23  ;SO IS RESULT
-0882   03DD             ;
-0883   03DD C3 D5 00                    JP      QHOW    ;ELSE WE HAVE OVERFLOW
-0884   03E0             ;
-0885   03E0 CF          XP25:           TSTC('-',XP42)  ;SUBTRACT?
-0885   03E1 2D          
-0885   03E2 86          
-0886   03E3 E5          XP26:           PUSH    HL      ;YES, SAVE 1ST <EXPR3>
-0887   03E4 CD ED 03                    CALL    EXPR3   ;GET 2ND <EXPR3>
-0888   03E7 CD E4 04                    CALL    CHGSGN  ;NEGATE
-0889   03EA C3 CF 03                    JP      XP24    ;AND ADD THEM
-0890   03ED             ;
-0891   03ED CD 4D 04    EXPR3:          CALL    EXPR4   ;GET 1ST <EXPR4>
-0892   03F0 CF          XP31:           TSTC('*',XP34)  ;MULTIPLY?
-0892   03F1 2A          
-0892   03F2 2D          
-0893   03F3 E5                          PUSH    HL      ;YES, SAVE 1ST
-0894   03F4 CD 4D 04                    CALL    EXPR4   ;AND GET 2ND <EXPR4>
-0895   03F7 06 00                       LD      B,0H    ;CLEAR B FOR SIGN
-0896   03F9 CD E1 04                    CALL    CHKSGN  ;CHECK SIGN
-0897   03FC E3                          EX      (SP),HL ;1ST IN HL
-0898   03FD CD E1 04                    CALL    CHKSGN  ;CHECK SIGN OF 1ST
-0899   0400 EB                          EX      DE,HL
-0900   0401 E3                          EX      (SP),HL
-0901   0402 7C                          LD      A,H     ;IS HL > 255 ?
-0902   0403 B7                          OR      A
-0903   0404 CA 0D 04                    JP      Z,XP32  ;NO
-0904   0407 7A                          LD      A,D     ;YES, HOW ABOUT DE
-0905   0408 B2                          OR      D
-0906   0409 EB                          EX      DE,HL   ;PUT SMALLER IN HL
-0907   040A C2 D6 00                    JP      NZ,AHOW ;ALSO >, WILL OVERFLOW
-0908   040D 7D          XP32:           LD      A,L     ;THIS IS DUMB
-0909   040E 21 00 00                    LD      HL,0H   ;CLEAR RESULT
-0910   0411 B7                          OR      A       ;ADD AND COUNT
-0911   0412 CA 3F 04                    JP      Z,XP35
-0912   0415 19          XP33:           ADD     HL,DE
-0913   0416 DA D6 00                    JP      C,AHOW  ;OVERFLOW
-0914   0419 3D                          DEC     A
-0915   041A C2 15 04                    JP      NZ,XP33
-0916   041D C3 3F 04                    JP      XP35    ;FINISHED
-0917   0420             ;
-0918   0420 CF          XP34:           TSTC('/',XP42)  ;DIVIDE?
-0918   0421 2F          
-0918   0422 46          
-0919   0423 E5                          PUSH    HL      ;YES, SAVE 1ST <EXPR4>
-0920   0424 CD 4D 04                    CALL    EXPR4   ;AND GET THE SECOND ONE
-0921   0427 06 00                       LD      B,0H    ;CLEAR B FOR SIGN
-0922   0429 CD E1 04                    CALL    CHKSGN  ;CHECK SIGN OF 2ND
-0923   042C E3                          EX      (SP),HL ;GET 1ST IN HL
-0924   042D CD E1 04                    CALL    CHKSGN  ;CHECK SIGN OF 1ST
-0925   0430 EB                          EX      DE,HL
-0926   0431 E3                          EX      (SP),HL
-0927   0432 EB                          EX      DE,HL
-0928   0433 7A                          LD      A,D     ;DIVIDE BY 0?
-0929   0434 B3                          OR      E
-0930   0435 CA D6 00                    JP      Z,AHOW  ;SAY "HOW?"
-0931   0438 C5                          PUSH    BC      ;ELSE SAVE SIGN
-0932   0439 CD C4 04                    CALL    DIVIDE  ;USE SUBROUTINE
-0933   043C 60                          LD      H,B     ;RESULT IN HL NOW
-0934   043D 69                          LD      L,C
-0935   043E C1                          POP     BC      ;GET SIGN BACK
-0936   043F D1          XP35:           POP     DE      ;AND TEXT POINTER
-0937   0440 7C                          LD      A,H     ;HL MUST BE +
-0938   0441 B7                          OR      A
-0939   0442 FA D5 00                    JP      M,QHOW  ;ELSE IT IS OVERFLOW
-0940   0445 78                          LD      A,B
-0941   0446 B7                          OR      A
-0942   0447 FC E4 04                    CALL    M,CHGSGN        ;CHANGE SIGN IF NEEDED
-0943   044A C3 F0 03                    JP      XP31    ;LOOK FOR MORE TERMS
-0944   044D             ;
-0945   044D 21 6A 07    EXPR4:          LD      HL,TAB4-1       ;FIND FUNCTION IN TAB4
-0946   0450 C3 BD 07                    JP      EXEC    ;AND GO DO IT
-0947   0453             ;
-0948   0453 FF          XP40:           RST     RTSTV   ;NO, NOT A FUNCTION
-0949   0454 DA 5C 04                    JP      C,XP41  ;NOR A VARIABLE
-0950   0457 7E                          LD      A,(HL)  ;VARIABLE
-0951   0458 23                          INC     HL
-0952   0459 66                          LD      H,(HL)  ;VALUE IN HL
-0953   045A 6F                          LD      L,A
-0954   045B C9                          RET
-0955   045C             ;
-0956   045C CD 7E 00    XP41:           CALL    TSTNUM  ;OR IS IT A NUMBER
-0957   045F 78                          LD      A,B     ;# OF DIGIT
-0958   0460 B7                          OR      A
-0959   0461 C0                          RET     NZ      ;OK
-0960   0462 CF          PARN:           TSTC($28,XP43)  ; '('
-0960   0463 28          
-0960   0464 05          
-0961   0465 DF                          RST     REXPR   ;"(EXPR)"
-0962   0466 CF                          TSTC($29,XP43)  ; ')'
-0962   0467 29          
-0962   0468 01          
-0963   0469 C9          XP42:           RET
-0964   046A C3 27 05    XP43:           JP      QWHAT   ;ELSE SAY: "WHAT?"
-0965   046D             
-0966   046D CD 62 04    RND:            CALL    PARN    ;*** RND(EXPR) ***
-0967   0470 7C                          LD      A,H     ;EXPR MUST BE +
-0968   0471 B7                          OR      A
-0969   0472 FA D5 00                    JP      M,QHOW
-0970   0475 B5                          OR      L       ;AND NON-ZERO
-0971   0476 CA D5 00                    JP      Z,QHOW
-0972   0479 D5                          PUSH    DE      ;SAVE BOTH
-0973   047A E5                          PUSH    HL
-0974   047B 2A 4C 17                    LD      HL,(RANPNT)     ;GET MEMORY AS RANDOM
-0975   047E 11 F7 07                    LD      DE,LSTROM       ;NUMBER
-0976   0481 E7                          RST     RCOMP
-0977   0482 DA 88 04                    JP      C,RA1   ;WRAP AROUND IF LAST
-0978   0485 21 00 00                    LD      HL,START
-0979   0488 5E          RA1:            LD      E,(HL)
-0980   0489 23                          INC     HL
-0981   048A 56                          LD      D,(HL)
-0982   048B 22 4C 17                    LD      (RANPNT),HL
-0983   048E E1                          POP     HL
-0984   048F EB                          EX      DE,HL
-0985   0490 C5                          PUSH    BC
-0986   0491 CD C4 04                    CALL    DIVIDE  ;RND(N)=MOD(M,N)+1
-0987   0494 C1                          POP     BC
-0988   0495 D1                          POP     DE
-0989   0496 23                          INC     HL
-0990   0497 C9                          RET
-0991   0498             
-0992   0498 CD 62 04    ABS:            CALL    PARN    ;*** ABS(EXPR) ***
-0993   049B 1B                          DEC     DE
-0994   049C CD E1 04                    CALL    CHKSGN  ;CHECK SIGN AND CHANGE IF HL < 0
-0995   049F 13                          INC     DE
-0996   04A0 C9                          RET
-0997   04A1             
-0998   04A1 2A 38 17    FREE:           LD      HL,(TXTUNF)     ;*** RETURN FREE IN HL ***
-0999   04A4 D5                          PUSH    DE              ;GET THE NUMBER OF FREE
-1000   04A5 EB                          EX      DE,HL           ;BYTES BETWEEN 'TXTUNF'
-1001   04A6 21 00 17                    LD      HL,TXTEND       ;AND 'TXTEND'
-1002   04A9 CD DA 04                    CALL    SUBDE
-1003   04AC D1                          POP     DE
-1004   04AD C9                          RET
-1005   04AE             
-1006   04AE CD 62 04    PEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
-1007   04B1 6E                          LD      L,(HL)  ;GET CONTENT OF (HL)
-1008   04B2 26 00                       LD      H,0     ;RETURN RESULT IN HL
-1009   04B4 C9                          RET
-1010   04B5             
-1011   04B5 CD 62 04    DEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
-1012   04B8 D5                          PUSH    DE
-1013   04B9 5E                          LD      E,(HL)  ;GET LOW CONTENT OF (HL)
-1014   04BA 23                          INC     HL
-1015   04BB 56                          LD      D,(HL)  ;GET HIGH CONTENT OF (HL)
-1016   04BC EB                          EX      DE,HL   ;RETURN RESULT IN HL
-1017   04BD D1                          POP     DE
-1018   04BE C9                          RET
-1019   04BF             
-1020   04BF 21 00 10    RAM:            LD      HL,RAMSZE
-1021   04C2 C9                          RET
-1022   04C3             
-1023   04C3 76          HALT:           HALT            ;HALT CPU (return to analyser)
-1024   04C4             ;
-1025   04C4             ;*************************************************************
-1026   04C4             ;
-1027   04C4             ; *** DIVIDE *** SUBDE *** CHKSGN *** CHGSGN *** & CKHLDE ***
-1028   04C4             ;
-1029   04C4             ; 'DIVIDE' DIVIDES HL BY DE, RESULT IN BC, REMAINDER IN HL
-1030   04C4             ;
-1031   04C4             ; 'SUBDE' SUBSTRACTS DE FROM HL
-1032   04C4             ;
-1033   04C4             ; 'CHKSGN' CHECKS SIGN OF HL.  IF +, NO CHANGE.  IF -, CHANGE
-1034   04C4             ; SIGN AND FLIP SIGN OF B.
-1035   04C4             ;
-1036   04C4             ; 'CHGSGN' CHECKS SIGN N OF HL AND B UNCONDITIONALLY.
-1037   04C4             ;
-1038   04C4             ; 'CKHLDE' CHECKS SIGN OF HL AND DE.  IF DIFFERENT, HL AND DE
-1039   04C4             ; ARE INTERCHANGED.  IF SAME SIGN, NOT INTERCHANGED.  EITHER
-1040   04C4             ; CASE, HL DE ARE THEN COMPARED TO SET THE FLAGS.
-1041   04C4             ;
-1042   04C4 E5          DIVIDE:         PUSH    HL      ;*** DIVIDE ***
-1043   04C5 6C                          LD      L,H     ;DIVIDE H BY DE
-1044   04C6 26 00                       LD      H,0
-1045   04C8 CD CF 04                    CALL    DV1
-1046   04CB 41                          LD      B,C     ;SAVE RESULT IN B
-1047   04CC 7D                          LD      A,L     ;(REMINDER+L)/DE
-1048   04CD E1                          POP     HL
-1049   04CE 67                          LD      H,A
-1050   04CF 0E FF       DV1:            LD      C,0FFH  ;RESULT IN C
-1051   04D1 0C          DV2:            INC     C       ;DUMB ROUTINE
-1052   04D2 CD DA 04                    CALL    SUBDE   ;DIVIDE BY SUBTRACT
-1053   04D5 D2 D1 04                    JP      NC,DV2  ;AND COUNT
-1054   04D8 19                          ADD     HL,DE
-1055   04D9 C9                          RET
-1056   04DA             ;
-1057   04DA 7D          SUBDE:          LD      A,L     ;*** SUBDE ***
-1058   04DB 93                          SUB     E       ;SUBSTRACT DE FROM
-1059   04DC 6F                          LD      L,A     ;HL
-1060   04DD 7C                          LD      A,H
-1061   04DE 9A                          SBC     A,D
-1062   04DF 67                          LD      H,A
-1063   04E0 C9                          RET
-1064   04E1             ;
-1065   04E1 7C          CHKSGN:         LD      A,H     ;*** CHKSGN ***
-1066   04E2 B7                          OR      A       ;CHECK SIGN OF HL
-1067   04E3 F0                          RET     P       ;IF >=0 RETURN
-1068   04E4             ;
-1069   04E4 7C          CHGSGN:         LD      A,H     ;*** CHGSGN ***
-1070   04E5 B5                          OR      L       ;IF HL == 0
-1071   04E6 C8                          RET     Z       ; RETURN
-1072   04E7 7C                          LD      A,H
-1073   04E8 F5                          PUSH    AF      ;SAVE SIGN
-1074   04E9 2F                          CPL             ;CHANGE SIGN OF HL
-1075   04EA 67                          LD      H,A
-1076   04EB 7D                          LD      A,L
-1077   04EC 2F                          CPL
-1078   04ED 6F                          LD      L,A
-1079   04EE 23                          INC     HL      ;HL = -HL
-1080   04EF F1                          POP     AF      ;GET ORIGINAL SIGN
-1081   04F0 AC                          XOR     H       ;
-1082   04F1 F2 D5 00                    JP      P,QHOW  ;SIGN UNCHANGED (HL=$8000)
-1083   04F4 78                          LD      A,B     ;AND ALSO FLIP B
-1084   04F5 EE 80                       XOR     80H
-1085   04F7 47                          LD      B,A
-1086   04F8 C9                          RET
-1087   04F9             
-1088   04F9 7C          CKHLDE:         LD      A,H
-1089   04FA AA                          XOR     D       ;SAME SIGN?
-1090   04FB F2 FF 04                    JP      P,CK1   ;YES, COMPARE
-1091   04FE EB                          EX      DE,HL   ;NO, XCH AND COMP
-1092   04FF E7          CK1:            RST     RCOMP
-1093   0500 C9                          RET
-1094   0501             ;
-1095   0501             ;*************************************************************
-1096   0501             ;
-1097   0501             ; *** SETVAL *** FIN *** ENDCHK *** & ERROR (& FRIENDS) ***
-1098   0501             ;
-1099   0501             ; "SETVAL" EXPECTS A VARIABLE, FOLLOWED BY AN EQUAL SIGN AND
-1100   0501             ; THEN AN EXPR.  IT EVALUATES THE EXPR. AND SET THE VARIABLE
-1101   0501             ; TO THAT VALUE.
-1102   0501             ;
-1103   0501             ; "FIN" CHECKS THE END OF A COMMAND.  IF IT ENDED WITH ";",
-1104   0501             ; EXECUTION CONTINUES.  IF IT ENDED WITH A CR, IT FINDS THE
-1105   0501             ; NEXT LINE AND CONTINUE FROM THERE.
-1106   0501             ;
-1107   0501             ; "ENDCHK" CHECKS IF A COMMAND IS ENDED WITH CR.  THIS IS
-1108   0501             ; REQUIRED IN CERTAIN COMMANDS.  (GOTO, RETURN, AND STOP ETC.)
-1109   0501             ;
-1110   0501             ; "ERROR" PRINTS THE STRING POINTED BY DE (AND ENDS WITH CR).
-1111   0501             ; IT THEN PRINTS THE LINE POINTED BY 'CURRNT' WITH A "?"
-1112   0501             ; INSERTED AT WHERE THE OLD TEXT POINTER (SHOULD BE ON TOP
-1113   0501             ; OF THE STACK) POINTS TO.  EXECUTION OF TB IS STOPPED
-1114   0501             ; AND TBI IS RESTARTED.  HOWEVER, IF 'CURRNT' -> ZERO
-1115   0501             ; (INDICATING A DIRECT COMMAND), THE DIRECT COMMAND IS NOT
-1116   0501             ; PRINTED.  AND IF 'CURRNT' -> NEGATIVE # (INDICATING 'INPUT'
-1117   0501             ; COMMAND), THE INPUT LINE IS NOT PRINTED AND EXECUTION IS
-1118   0501             ; NOT TERMINATED BUT CONTINUED AT 'INPERR'.
-1119   0501             ;
-1120   0501             ; RELATED TO 'ERROR' ARE THE FOLLOWING:
-1121   0501             ; 'QWHAT' SAVES TEXT POINTER IN STACK AND GET MESSAGE "WHAT?"
-1122   0501             ; 'AWHAT' JUST GET MESSAGE "WHAT?" AND JUMP TO 'ERROR'.
-1123   0501             ; 'QSORRY' AND 'ASORRY' DO SAME KIND OF THING.
-1124   0501             ; 'AHOW' AND 'AHOW' IN THE ZERO PAGE SECTION ALSO DO THIS.
-1125   0501             ;
-1126   0501 FF          SETVAL:         RST     RTSTV   ;*** SETVAL ***
-1127   0502 DA 27 05                    JP      C,QWHAT ;"WHAT?" NO VARIABLE
-1128   0505 E5                          PUSH    HL      ;SAVE ADDRESS OF VAR.
-1129   0506 CF                          TSTC('=',SV1)   ;PASS "=" SIGN
-1129   0507 3D          
-1129   0508 08          
-1130   0509 DF                          RST     REXPR   ;EVALUATE EXPR.
-1131   050A 44                          LD      B,H     ;VALUE IS IN BC NOW
-1132   050B 4D                          LD      C,L
-1133   050C E1                          POP     HL      ;GET ADDRESS
-1134   050D 71                          LD      (HL),C  ;SAVE VALUE
-1135   050E 23                          INC     HL
-1136   050F 70                          LD      (HL),B
-1137   0510 C9                          RET
-1138   0511 C3 27 05    SV1:            JP      QWHAT   ;NO "=" SIGN
-1139   0514             
-1140   0514 CF          FIN:            TSTC(';',FI1)   ;*** FIN ***
-1140   0515 3B          
-1140   0516 04          
-1141   0517 F1                          POP     AF      ;";", PURGE RET. ADDR.
-1142   0518 C3 8D 01                    JP      RUNSML  ;CONTINUE SAME LINE
-1143   051B CF          FI1:            TSTC(CR,FI2)    ;NOT ";", IS IT CR?
-1143   051C 0D          
-1143   051D 04          
-1144   051E F1                          POP     AF      ;YES, PURGE RET. ADDR.
-1145   051F C3 7D 01                    JP      RUNNXL  ;RUN NEXT LINE
-1146   0522 C9          FI2:            RET             ;ELSE RETURN TO CALLER
-1147   0523             
-1148   0523 EF          ENDCHK:         RST     RIGNBLK ;IGNBLK
-1149   0524 FE 0D                       CP      CR      ;END WITH CR?
-1150   0526 C8                          RET     Z       ;OK, ELSE SAY: "WHAT?"
-1151   0527             ;
-1152   0527 D5          QWHAT:          PUSH    DE      ;*** QWHAT ***
-1153   0528 11 E4 00    AWHAT:          LD      DE,WHAT ;*** AWHAT ***
-1154   052B 97          ERROR:          SUB     A       ;*** ERROR ***
-1155   052C CD CC 05                    CALL    PRTSTG  ;PRINT 'WHAT?', 'HOW?'
-1156   052F D1                          POP     DE      ;OR 'SORRY'
-1157   0530 1A                          LD      A,(DE)  ;SAVE THE CHARACTER
-1158   0531 F5                          PUSH    AF      ;AT WHERE OLD DE ->
-1159   0532 97                          SUB     A       ;AND PUT A 0 THERE
-1160   0533 12                          LD      (DE),A
-1161   0534 2A 3A 17                    LD      HL,(CURRNT)     ;GET CURRENT LINE #
-1162   0537 E5                          PUSH    HL
-1163   0538 7E                          LD      A,(HL)  ;CHECK THE VALUE
-1164   0539 23                          INC     HL
-1165   053A B6                          OR      (HL)
-1166   053B D1                          POP     DE
-1167   053C CA F0 00                    JP      Z,RSTART        ;IF ZERO, JUST RESTART
-1168   053F 7E                          LD      A,(HL)  ;IF NEGATIVE,
-1169   0540 B7                          OR      A
-1170   0541 FA 0E 03                    JP      M,INPERR        ;REDO INPUT
-1171   0544 CD 65 06                    CALL    PRTLN   ;ELSE PRINT THE LINE
-1172   0547 1B                          DEC     DE      ;UPTO WHERE THE 0 IS
-1173   0548 F1                          POP     AF      ;RESTORE THE CHARACTER
-1174   0549 12                          LD      (DE),A
-1175   054A 3E 3F                       LD      A,'?'   ;PRINT A "?"
-1176   054C D7                          RST     ROUTC
-1177   054D 97                          SUB     A       ;AND THE REST OF THE
-1178   054E CD CC 05                    CALL    PRTSTG  ;LINE
-1179   0551 C3 F0 00                    JP      RSTART  ;THEN RESTART
-1180   0554             ;
-1181   0554 D5          QSORRY:         PUSH    DE      ;*** QSORRY ***
-1182   0555 11 EA 00    ASORRY:         LD      DE,SORRY        ;*** ASORRY ***
-1183   0558 C3 2B 05                    JP      ERROR
-1184   055B             ;
-1185   055B             ;*************************************************************
-1186   055B             ;
-1187   055B             ; *** GETLN *** FNDLN (& FRIENDS) ***
-1188   055B             ;
-1189   055B             ; 'GETLN' READS A INPUT LINE INTO 'BUFFER'.  IT FIRST PROMPT
-1190   055B             ; THE CHARACTER IN A (GIVEN BY THE CALLER), THEN IT FILLS
-1191   055B             ; THE BUFFER AND ECHOS.  IT IGNORES LF'S AND NULLS, BUT STILL
-1192   055B             ; ECHOS THEM BACK.  RUB-OUT IS USED TO CAUSE IT TO DELETE
-1193   055B             ; THE LAST CHARACTER (IF THERE IS ONE), AND ALT-MOD IS USED TO
-1194   055B             ; CAUSE IT TO DELETE THE WHOLE LINE AND START IT ALL OVER.
-1195   055B             ; CR SIGNALS THE END OF A LINE, AND CAUSE 'GETLN' TO RETURN.
-1196   055B             ;
-1197   055B             ; 'FNDLN' FINDS A LINE WITH A GIVEN LINE # (IN HL) IN THE
-1198   055B             ; TEXT SAVE AREA.  DE IS USED AS THE TEXT POINTER.  IF THE
-1199   055B             ; LINE IS FOUND, DE WILL POINT TO THE BEGINNING OF THAT LINE
-1200   055B             ; (I.E., THE LOW BYTE OF THE LINE #), AND FLAGS ARE NC & Z.
-1201   055B             ; IF THAT LINE IS NOT THERE AND A LINE WITH A HIGHER LINE #
-1202   055B             ; IS FOUND, DE POINTS TO THERE AND FLAGS ARE NC & NZ.  IF
-1203   055B             ; WE REACHED THE END OF TEXT SAVE AREA AND CANNOT FIND THE
-1204   055B             ; LINE, FLAGS ARE C & NZ.
-1205   055B             ; 'FNDLN' WILL INITIALIZE DE TO THE BEGINNING OF THE TEXT SAVE
-1206   055B             ; AREA TO START THE SEARCH.  SOME OTHER ENTRIES OF THIS
-1207   055B             ; ROUTINE WILL NOT INITIALIZE DE AND DO THE SEARCH.
-1208   055B             ; 'FNDLNP' WILL START WITH DE AND SEARCH FOR THE LINE #.
-1209   055B             ; 'FNDNXT' WILL BUMP DE BY 2, FIND A CR AND THEN START SEARCH.
-1210   055B             ; 'FNDSKP' USE DE TO FIND A CR, AND THEN START SEARCH.
-1211   055B             ;
-1212   055B D7          GETLN:          RST     ROUTC   ;*** GETLN ***
-1213   055C 11 4E 17                    LD      DE,BUFFER       ;PROMPT AND INIT.
-1214   055F CD F5 06    GL1:            CALL    CHKIO   ;CHECK KEYBOARD
-1215   0562 CA 5F 05                    JP      Z,GL1   ;NO INPUT, WAIT
-1216   0565 FE 08                       CP      BS      ;BS, DELETE LAST CHARACTER?
-1217   0567 CA 89 05                    JP      Z,GL3   ;YES
-1218   056A FE 7F                       CP      DEL     ;DEL, DELETE LAST CHARACTER?
-1219   056C CA 89 05                    JP      Z,GL3   ;YES
-1220   056F D7                          RST     ROUTC   ;INPUT, ECHO BACK
-1221   0570 FE 0A                       CP      LF      ;IGNORE LF
-1222   0572 CA 5F 05                    JP      Z,GL1
-1223   0575 B7                          OR      A       ;IGNORE NULL
-1224   0576 CA 5F 05                    JP      Z,GL1
-1225   0579 FE 18                       CP      CAN     ;^X, DELETE THE WHOLE LINE?
-1226   057B CA 9C 05                    JP      Z,GL4   ;YES
-1227   057E 12                          LD      (DE),A  ;ELSE SAVE INPUT
-1228   057F 13                          INC     DE      ;AND BUMP POINTER
-1229   0580 FE 0D                       CP      CR      ;WAS IT CR?
-1230   0582 C8                          RET     Z       ;YES, END OF LINE
-1231   0583 7B                          LD      A,E     ;ELSE MORE FREE ROOM?
-1232   0584 FE 8E                       CP      BUFEND & 0FFH
-1233   0586 C2 5F 05                    JP      NZ,GL1  ;YES, GET NEXT INPUT
-1234   0589 7B          GL3:            LD      A,E     ;DELETE LAST CHARACTER
-1235   058A FE 4E                       CP      BUFFER & 0FFH   ;BUT DO WE HAVE ANY?
-1236   058C CA 9C 05                    JP      Z,GL4   ;NO, REDO WHOLE LINE
-1237   058F 1B                          DEC     DE      ;YES, BACKUP POINTER
-1238   0590 3E 08                       LD      A,BS    ;AND ECHO A BACKSPACE
-1239   0592 D7                          RST     ROUTC
-1240   0593 3E 20                       LD      A,' '   ;AND ECHO A BLANK
-1241   0595 D7                          RST     ROUTC
-1242   0596 3E 08                       LD      A,BS    ;AND ECHO A BACKSPACE
-1243   0598 D7                          RST     ROUTC
-1244   0599 C3 5F 05                    JP      GL1     ;GO GET NEXT INPUT
-1245   059C CD 0E 00    GL4:            CALL    CRLF    ;REDO ENTIRE LINE
-1246   059F 3E 5E                       LD      A,'^'   ;CR, LF AND UP-ARROW
-1247   05A1 C3 5B 05                    JP      GETLN
-1248   05A4             ;
-1249   05A4 7C          FNDLN:          LD      A,H     ;*** FNDLN ***
-1250   05A5 B7                          OR      A       ;CHECK SIGN OF HL
-1251   05A6 FA D5 00                    JP      M,QHOW  ;IT CANNOT BE -
-1252   05A9 11 00 08                    LD      DE,TXTBGN       ;INIT TEXT POINTER
-1253   05AC             ;
-1254   05AC             FNDLP:          ;*** FDLNP ***
-1255   05AC E5          FL1:            PUSH    HL      ;SAVE LINE #
-1256   05AD 2A 38 17                    LD      HL,(TXTUNF)     ;CHECK IF WE PASSED END
-1257   05B0 2B                          DEC     HL
-1258   05B1 E7                          RST     RCOMP
-1259   05B2 E1                          POP     HL      ;GET LINE # BACK
-1260   05B3 D8                          RET     C       ;C,NZ PASSED END
-1261   05B4 1A                          LD      A,(DE)  ;WE DID NOT, GET BYTE 1
-1262   05B5 95                          SUB     L       ;IS THIS THE LINE?
-1263   05B6 47                          LD      B,A     ;COMPARE LOW ORDER
-1264   05B7 13                          INC     DE
-1265   05B8 1A                          LD      A,(DE)  ;GET BYTE 2
-1266   05B9 9C                          SBC     A,H     ;COMPARE HIGH ORDER
-1267   05BA DA C1 05                    JP      C,FL2   ;NO, NOT THERE YET
-1268   05BD 1B                          DEC     DE      ;ELSE WE EITHER FOUND
-1269   05BE B0                          OR      B       ;IT, OR IT IS NOT THERE
-1270   05BF C9                          RET     ;NC,Z:FOUND, NC,NZ:NO
-1271   05C0             ;
-1272   05C0             FNDNXT:         ;*** FNDNXT ***
-1273   05C0 13                          INC     DE      ;FIND NEXT LINE
-1274   05C1 13          FL2:            INC     DE      ;JUST PASSED BYTE 1 & 2
-1275   05C2             ;
-1276   05C2 1A          FNDSKP:         LD      A,(DE)  ;*** FNDSKP ***
-1277   05C3 FE 0D                       CP      CR      ;TRY TO FIND CR
-1278   05C5 C2 C1 05                    JP      NZ,FL2  ;KEEP LOOKING
-1279   05C8 13                          INC     DE      ;FOUND CR, SKIP OVER
-1280   05C9 C3 AC 05                    JP      FL1     ;CHECK IF END OF TEXT
-1281   05CC             ;
-1282   05CC             ;*************************************************************
-1283   05CC             ;
-1284   05CC             ; *** PRTSTG *** QTSTG *** PRTNUM *** & PRTLN ***
-1285   05CC             ;
-1286   05CC             ; 'PRTSTG' PRINTS A STRING POINTED BY DE.  IT STOPS PRINTING
-1287   05CC             ; AND RETURNS TO CALLER WHEN EITHER A CR IS PRINTED OR WHEN
-1288   05CC             ; THE NEXT BYTE IS THE SAME AS WHAT WAS IN A (GIVEN BY THE
-1289   05CC             ; CALLER).  OLD A IS STORED IN B, OLD B IS LOST.
-1290   05CC             ;
-1291   05CC             ; 'QTSTG' LOOKS FOR A BACK-ARROW, SINGLE QUOTE, OR DOUBLE
-1292   05CC             ; QUOTE.  IF NONE OF THESE, RETURN TO CALLER.  IF BACK-ARROW,
-1293   05CC             ; OUTPUT A CR WITHOUT A LF.  IF SINGLE OR DOUBLE QUOTE, PRINT
-1294   05CC             ; THE STRING IN THE QUOTE AND DEMANDS A MATCHING UNQUOTE.
-1295   05CC             ; AFTER THE PRINTING THE NEXT 3 BYTES OF THE CALLER IS SKIPPED
-1296   05CC             ; OVER (USUALLY A JUMP INSTRUCTION.
-1297   05CC             ;
-1298   05CC             ; 'PRTNUM' PRINTS THE NUMBER IN HL.  LEADING BLANKS ARE ADDED
-1299   05CC             ; IF NEEDED TO PAD THE NUMBER OF SPACES TO THE NUMBER IN C.
-1300   05CC             ; HOWEVER, IF THE NUMBER OF DIGITS IS LARGER THAN THE # IN
-1301   05CC             ; C, ALL DIGITS ARE PRINTED ANYWAY.  NEGATIVE SIGN IS ALSO
-1302   05CC             ; PRINTED AND COUNTED IN, POSITIVE SIGN IS NOT.
-1303   05CC             ;
-1304   05CC             ; 'PRTLN' PRINTS A SAVED TEXT LINE WITH LINE # AND ALL.
-1305   05CC             ;
-1306   05CC 47          PRTSTG:         LD      B,A     ;*** PRTSTG ***
-1307   05CD 1A          PS1:            LD      A,(DE)  ;GET A CHARACTER
-1308   05CE 13                          INC     DE      ;BUMP POINTER
-1309   05CF B8                          CP      B       ;SAME AS OLD A?
-1310   05D0 C8                          RET     Z       ;YES, RETURN
-1311   05D1 D7                          RST     ROUTC   ;ELSE PRINT IT
-1312   05D2 FE 0D                       CP      CR      ;WAS IT A CR?
-1313   05D4 C2 CD 05                    JP      NZ,PS1  ;NO, NEXT
-1314   05D7 C9                          RET             ;YES, RETURN
-1315   05D8             ;
-1316   05D8 CF          QTSTG:          TSTC($22,QT3)   ;*** QTSTG ***
-1316   05D9 22          
-1316   05DA 0F          
-1317   05DB 3E 22                       LD      A,22H   ;IT IS A '"'
-1318   05DD CD CC 05    QT1:            CALL    PRTSTG  ;PRINT UNTIL ANOTHER
-1319   05E0 FE 0D       QT1A:           CP      CR      ;WAS LAST ONE A CR?
-1320   05E2 E1                          POP     HL      ;RETURN ADDRESS
-1321   05E3 CA 7D 01                    JP      Z,RUNNXL        ;WAS CR, RUN NEXT LINE
-1322   05E6 23          QT2:            INC     HL      ;SKIP 3 BYTES ON RETURN
-1323   05E7 23                          INC     HL
-1324   05E8 23                          INC     HL
-1325   05E9 E9                          JP      (HL)    ;RETURN
-1326   05EA CF          QT3:            TSTC($27,QT4)   ;IS IT A "'"?
-1326   05EB 27          
-1326   05EC 05          
-1327   05ED 3E 27                       LD      A,27H   ;YES, DO THE SAME
-1328   05EF C3 DD 05                    JP      QT1     ;AS IN '"'
-1329   05F2 CF          QT4:            TSTC($5F,QT5)   ;IS IT UNDERLINE?
-1329   05F3 5F          
-1329   05F4 07          
-1330   05F5 3E 8D                       LD      A,08DH  ;YES, CR WITHOUT LF
-1331   05F7 D7                          RST     ROUTC
-1332   05F8 E1                          POP     HL      ;RETURN ADDRESS
-1333   05F9 C3 E6 05                    JP      QT2
-1334   05FC CF          QT5:            TSTC(5EH,QT5)   ;RST 1, is it '^'?
-1334   05FD 5E          
-1334   05FE FD          
-1335   05FF 1A                          LD      A,(DE)
-1336   0600 EE 40                       XOR     40H
-1337   0602 CD 10 00                    CALL    OUTC
-1338   0605 1A                          LD      A,(DE)
-1339   0606 13                          INC     DE
-1340   0607 C3 E0 05                    JP      QT1A
-1341   060A C9          QT6:            RET             ;NONE OF ABOVE
-1342   060B             
-1343   060B             PRTNUM:                         ;*** PRINT NUMBER IN HL ***
-1344   060B 3A 37 17                    LD      A,(PNBASE)      ;GET NUMBER BASE
-1345   060E FE 10                       CP      16      ;HEX NUMBER?
-1346   0610 C2 19 06                    JP      NZ,PN0  ;NO, CHECK SIGN
-1347   0613 06 24                       LD      B,'$'   ;PRINT LEADING '$'
-1348   0615 0D                          DEC     C       ;'$' TAKES SPACE
-1349   0616 C3 24 06                    JP      PN1     ;HEX IS UNSIGNED
-1350   0619 06 00       PN0:            LD      B,0     ;NO PREFIX YET
-1351   061B CD E1 04                    CALL    CHKSGN  ;CHECK SIGN
-1352   061E F2 24 06                    JP      P,PN1   ;NO SIGN
-1353   0621 06 2D                       LD      B,'-'   ;B=SIGN
-1354   0623 0D                          DEC     C       ;'-' TAKES SPACE
-1355   0624 D5          PN1:            PUSH    DE
-1356   0625 3A 37 17                    LD      A,(PNBASE)
-1357   0628 5F                          LD      E,A
-1358   0629 AF                          XOR     A
-1359   062A 57                          LD      D,A
-1360   062B D5                          PUSH    DE      ;SAVE AS A FLAG
-1361   062C 0D                          DEC     C       ;C=SPACES
-1362   062D C5                          PUSH    BC      ;SAVE SIGN & SPACE
-1363   062E CD C4 04    PN2:            CALL    DIVIDE  ;DIVIDE HL BY NUMBER BASE
-1364   0631 78                          LD      A,B     ;RESULT 0?
-1365   0632 B1                          OR      C
-1366   0633 CA 3E 06                    JP      Z,PN3   ;YES, WE GOT ALL
-1367   0636 E3                          EX      (SP),HL ;NO, SAVE REMAINDER
-1368   0637 2D                          DEC     L       ;AND COUNT SPACE
-1369   0638 E5                          PUSH    HL      ;HL IS OLD BC
-1370   0639 60                          LD      H,B     ;MOVE RESULT TO BC
-1371   063A 69                          LD      L,C
-1372   063B C3 2E 06                    JP      PN2     ;AND DIVIDE AGAIN
-1373   063E             ;
-1374   063E C1          PN3:            POP     BC      ;WE GOT ALL DIGITS IN
-1375   063F 0D          PN4:            DEC     C       ;THE STACK
-1376   0640 79                          LD      A,C     ;LOOK AT SPACE COUNT
-1377   0641 B7                          OR      A
-1378   0642 FA 4B 06                    JP      M,PN5   ;NO LEADING BLANKS
-1379   0645 3E 20                       LD      A,' '   ;LEADING BLANKS
-1380   0647 D7                          RST     ROUTC
-1381   0648 C3 3F 06                    JP      PN4     ;MORE?
-1382   064B 78          PN5:            LD      A,B     ;PRINT SIGN OR '$'
-1383   064C B7                          OR      A
-1384   064D C4 10 00                    CALL    NZ,OUTC
-1385   0650 5D                          LD      E,L     ;LAST REMAINDER IN E
-1386   0651 3A 37 17    PN6:            LD      A,(PNBASE)      ;GET NUMBER BASE
-1387   0654 BB                          CP      E       ;IT IS FLAG FOR NO MORE
-1388   0655 7B                          LD      A,E     ;CHECK DIGIT IN E
-1389   0656 D1                          POP     DE
-1390   0657 C8                          RET     Z       ;IF SO, RETURN
-1391   0658 FE 0A                       CP      10      ;0-9? < A hex?
-1392   065A DA 5F 06                    JP      C,PN7   ;Skip Add 7
-1393   065D C6 07                       ADD     A,'A'-'0'-10    ;Bring it up to ASCII A-F
-1394   065F C6 30       PN7:            ADD     A,'0'   ;ELSE CONVERT TO ASCII
-1395   0661 D7                          RST     ROUTC   ;AND PRINT THE DIGIT
-1396   0662 C3 51 06                    JP      PN6     ;GO BACK FOR MORE
-1397   0665             
-1398   0665 3E 0A       PRTLN:          LD      A,10    ;SET 10 AS DEFAULT BASE
-1399   0667 32 37 17                    LD      (PNBASE),A      ;FOR PRTNUM
-1400   066A 1A                          LD      A,(DE)
-1401   066B 6F                          LD      L,A     ;LOW ORDER LINE #
-1402   066C 13                          INC     DE
-1403   066D 1A                          LD      A,(DE)  ;HIGH ORDER
-1404   066E 67                          LD      H,A
-1405   066F 13                          INC     DE
-1406   0670 0E 04                       LD      C,4     ;PRINT 4 DIGIT LINE #
-1407   0672 CD 0B 06                    CALL    PRTNUM
-1408   0675 3E 20                       LD      A,' '   ;FOLLOWED BY A BLANK
-1409   0677 D7                          RST     ROUTC
-1410   0678 97                          SUB     A       ;AND THEN THE NEXT
-1411   0679 CD CC 05                    CALL    PRTSTG
-1412   067C C9                          RET
-1413   067D             ;
-1414   067D             ;*************************************************************
-1415   067D             ;
-1416   067D             ; *** MVUP *** MVDOWN *** POPA *** & PUSHA ***
-1417   067D             ;
-1418   067D             ; 'MVUP' MOVES A BLOCK UP FROM WHERE DE-> TO WHERE BC-> UNTIL
-1419   067D             ; DE = HL
-1420   067D             ;
-1421   067D             ; 'MVDOWN' MOVES A BLOCK DOWN FROM WHERE DE-> TO WHERE HL->
-1422   067D             ; UNTIL DE = BC
-1423   067D             ;
-1424   067D             ; 'POPA' RESTORES THE 'FOR' LOOP VARIABLE SAVE AREA FROM THE
-1425   067D             ; STACK
-1426   067D             ;
-1427   067D             ; 'PUSHA' STACKS THE 'FOR' LOOP VARIABLE SAVE AREA INTO THE
-1428   067D             ; STACK
-1429   067D             ;
-1430   067D E7          MVUP:           RST     RCOMP   ;*** MVUP ***
-1431   067E C8                          RET     Z       ;DE = HL, RETURN
-1432   067F 1A                          LD      A,(DE)  ;GET ONE BYTE
-1433   0680 02                          LD      (BC),A  ;MOVE IT
-1434   0681 13                          INC     DE      ;INCREASE BOTH POINTERS
-1435   0682 03                          INC     BC
-1436   0683 C3 7D 06                    JP      MVUP    ;UNTIL DONE
-1437   0686             ;
-1438   0686 78          MVDOWN:         LD      A,B     ;*** MVDOWN ***
-1439   0687 92                          SUB     D       ;TEST IF DE = BC
-1440   0688 C2 8E 06                    JP      NZ,MD1  ;NO, GO MOVE
-1441   068B 79                          LD      A,C     ;MAYBE, OTHER BYTE?
-1442   068C 93                          SUB     E
-1443   068D C8                          RET     Z       ;YES, RETURN
-1444   068E 1B          MD1:            DEC     DE      ;ELSE MOVE A BYTE
-1445   068F 2B                          DEC     HL      ;BUT FIRST DECREASE
-1446   0690 1A                          LD      A,(DE)  ;BOTH POINTERS AND
-1447   0691 77                          LD      (HL),A  ;THEN DO IT
-1448   0692 C3 86 06                    JP      MVDOWN  ;LOOP BACK
-1449   0695             ;
-1450   0695 C1          POPA:           POP     BC      ;BC = RETURN ADDR.
-1451   0696 E1                          POP     HL      ;RESTORE LOPVAR, BUT
-1452   0697 22 42 17                    LD      (LOPVAR),HL     ;=0 MEANS NO MORE
-1453   069A 7C                          LD      A,H
-1454   069B B5                          OR      L
-1455   069C CA AF 06                    JP      Z,PP1   ;YEP, GO RETURN
-1456   069F E1                          POP     HL      ;NOP, RESTORE OTHERS
-1457   06A0 22 44 17                    LD      (LOPINC),HL
-1458   06A3 E1                          POP     HL
-1459   06A4 22 46 17                    LD      (LOPLMT),HL
-1460   06A7 E1                          POP     HL
-1461   06A8 22 48 17                    LD      (LOPLN),HL
-1462   06AB E1                          POP     HL
-1463   06AC 22 4A 17                    LD      (LOPPT),HL
-1464   06AF C5          PP1:            PUSH    BC      ;BC = RETURN ADDR.
-1465   06B0 C9                          RET
-1466   06B1             ;
-1467   06B1 21 8F 17    PUSHA:          LD      HL,STKLMT       ;*** PUSHA ***
-1468   06B4 CD E4 04                    CALL    CHGSGN
-1469   06B7 C1                          POP     BC      ;BC=RETURN ADDRESS
-1470   06B8 39                          ADD     HL,SP   ;IS STACK NEAR THE TOP?
-1471   06B9 D2 54 05                    JP      NC,QSORRY       ;YES, SORRY FOR THAT
-1472   06BC 2A 42 17                    LD      HL,(LOPVAR)     ;ELSE SAVE LOOP VAR'S
-1473   06BF 7C                          LD      A,H     ;BUT IF LOPVAR IS 0
-1474   06C0 B5                          OR      L       ;THAT WILL BE ALL
-1475   06C1 CA D7 06                    JP      Z,PU1
-1476   06C4 2A 4A 17                    LD      HL,(LOPPT)      ;ELSE, MORE TO SAVE
-1477   06C7 E5                          PUSH    HL
-1478   06C8 2A 48 17                    LD      HL,(LOPLN)
-1479   06CB E5                          PUSH    HL
-1480   06CC 2A 46 17                    LD      HL,(LOPLMT)
-1481   06CF E5                          PUSH    HL
-1482   06D0 2A 44 17                    LD      HL,(LOPINC)
-1483   06D3 E5                          PUSH    HL
-1484   06D4 2A 42 17                    LD      HL,(LOPVAR)
-1485   06D7 E5          PU1:            PUSH    HL
-1486   06D8 C5                          PUSH    BC      ;BC = RETURN ADDR.
-1487   06D9 C9                          RET
-1488   06DA             
-1489   06DA             ;*************************************************************
-1490   06DA             ;
-1491   06DA             ; *** OUTC *** CHKIO ***
-1492   06DA             ;
-1493   06DA             ; THESE ARE THE ONLY I/O ROUTINES IN TBI.
-1494   06DA             ; OUTC WILL OUTPUT THE BYTE IN A.
-1495   06DA             ; IF THAT IS A CR, A LF IS ALSO SEND OUT.
-1496   06DA             ; ONLY THE FLAGS MAY BE CHANGED AT RETURN.
-1497   06DA             ; ALL REGISTERS ARE RESTORED.
-1498   06DA             ;
-1499   06DA             ; 'CHKIO' CHECKS THE INPUT.  IF NO INPUT, IT WILL RETURN TO
-1500   06DA             ; THE CALLER WITH THE Z FLAG SET.  IF THERE IS INPUT, Z FLAG
-1501   06DA             ; IS CLEARED AND THE INPUT BYTE IS IN A.  HOWEVER, IF THE
-1502   06DA             ; INPUT IS A CONTROL-O, THE 'OCSW' SWITCH IS COMPLIMENTED, AND
-1503   06DA             ; Z FLAG IS RETURNED.  IF A CONTROL-C IS READ, 'CHKIO' WILL
-1504   06DA             ; RESTART TBI AND DO NOT RETURN TO THE CALLER.
-1505   06DA             ;
-1506   06DA             ;THIS IS AT LOC. 0
-1507   06DA             ;START:         LD      SP,STACK        ;*** COLD START ***
-1508   06DA             ;               LD      A,0FFH
-1509   06DA             ;               JP      INIT
-1510   06DA             
-1511   06DA 11 04 07    INIT:           LD      DE,MSG1
-1512   06DD CD CC 05                    CALL    PRTSTG
-1513   06E0 21 00 00                    LD      HL,START
-1514   06E3 22 4C 17                    LD      (RANPNT),HL
-1515   06E6 21 00 08                    LD      HL,TXTBGN
-1516   06E9 22 38 17                    LD      (TXTUNF),HL
-1517   06EC C3 F0 00                    JP      RSTART
-1518   06EF             
-1519   06EF             ;THIS IS AT LOC. 10
-1520   06EF             ;OUTC:          OUT     (IODATA),A      ;Out to data port
-1521   06EF             ;               CP      CR      ;WAS IT CR?
-1522   06EF             ;               RET     NZ      ;NO, FINISHED
-1523   06EF             ;               JP      OC1     ;REST OF THIS IS AT OC1
-1524   06EF 3E 0A       OC1:            LD      A,LF    ;YES, WE SEND LF TOO
-1525   06F1 D7                          RST     ROUTC   ;THIS IS RECURSIVE
-1526   06F2 3E 0D                       LD      A,CR    ;GET CR BACK IN A
-1527   06F4 C9                          RET
-1528   06F5             
-1529   06F5 DB 02       CHKIO:          IN      A,(IOSTAT)      ;*** CHKIO ***
-1530   06F7 E6 01                       AND     IO_RX_BIT       ;MASK STATUS BIT
-1531   06F9 C8                          RET     Z       ;NOT READY, RETURN "Z"
-1532   06FA DB 01                       IN      A,(IODATA)      ;READY, READ DATA
-1533   06FC E6 7F                       AND     7FH     ;MASK BIT 7 OFF
-1534   06FE FE 03       CI0:            CP      03H     ;IS IT CONTROL-C?
-1535   0700 C0                          RET     NZ      ;NO, RETURN "NZ"
-1536   0701 C3 F0 00                    JP      RSTART  ;YES, RESTART TBI
-1537   0704             ;
-1538   0704 54 69 6E 79 MSG1:           .DB     "TinyBASIC"
-1538   0708 42 41 53 49 
-1538   070C 43 
-1539   070D 0D                          .DB     CR
-1540   070E             
-1541   070E             
-1542   070E             ;*************************************************************
-1543   070E             ;
-1544   070E             ; *** TABLES *** DIRECT *** & EXEC ***
-1545   070E             ;
-1546   070E             ; THIS SECTION OF THE CODE TESTS A STRING AGAINST A TABLE.
-1547   070E             ; WHEN A MATCH IS FOUND, CONTROL IS TRANSFERED TO THE SECTION
-1548   070E             ; OF CODE ACCORDING TO THE TABLE.
-1549   070E             ;
-1550   070E             ; AT 'EXEC', DE SHOULD POINT TO THE STRING AND HL SHOULD POINT
-1551   070E             ; TO THE TABLE-1.  AT 'DIRECT', DE SHOULD POINT TO THE STRING.
-1552   070E             ; HL WILL BE SET UP TO POINT TO TAB1-1, WHICH IS THE TABLE OF
-1553   070E             ; ALL DIRECT AND STATEMENT COMMANDS.
-1554   070E             ;
-1555   070E             ; A '.' IN THE STRING WILL TERMINATE THE TEST AND THE PARTIAL
-1556   070E             ; MATCH WILL BE CONSIDERED AS A MATCH.  E.G., 'P.', 'PR.',
-1557   070E             ; 'PRI.', 'PRIN.', OR 'PRINT' WILL ALL MATCH 'PRINT'.
-1558   070E             ;
-1559   070E             ; THE TABLE CONSISTS OF ANY NUMBER OF ITEMS.  EACH ITEM
-1560   070E             ; IS A STRING OF CHARACTERS WITH BIT 7 SET TO 0 AND
-1561   070E             ; A JUMP ADDRESS STORED HI-LOW WITH BIT 7 OF THE HIGH
-1562   070E             ; BYTE SET TO 1.
-1563   070E             ; This is done by the macro 'DWA'.
-1564   070E             ; If the program is executed from an address < 0x8000
-1565   070E             ; take care to mask this bit in program part 'EXEC'.
-1566   070E             ;
-1567   070E             ; END OF TABLE IS AN ITEM WITH A JUMP ADDRESS ONLY.  IF THE
-1568   070E             ; STRING DOES NOT MATCH ANY OF THE OTHER ITEMS, IT WILL
-1569   070E             ; MATCH THIS NULL ITEM AS DEFAULT.
-1570   070E             ;
-1571   070E             TAB1:           ;DIRECT COMMANDS
-1572   070E 4C 49 53 54                 .DB     "LIST"
-1573   0712 81                          DWA(LIST)
-1573   0713 A5          
-1574   0714 52 55 4E                    .DB     "RUN"
-1575   0717 81                          DWA(RUN)
-1575   0718 77          
-1576   0719 4E 45 57                    .DB     "NEW"
-1577   071C 81                          DWA(NEW)
-1577   071D 68          
-1578   071E             ;
-1579   071E             TAB2:           ;DIRECT/STATEMENT
-1580   071E 4E 45 58 54                 .DB     "NEXT"
-1581   0722 82                          DWA(NEXT)
-1581   0723 A2          
-1582   0724 4C 45 54                    .DB     "LET"
-1583   0727 83                          DWA(LET)
-1583   0728 6B          
-1584   0729 49 46                       .DB     "IF"
-1585   072B 82                          DWA(IFF)
-1585   072C FF          
-1586   072D 47 4F 54 4F                 .DB     "GOTO"
-1587   0731 81                          DWA(GOTO)
-1587   0732 96          
-1588   0733 47 4F 53 55                 .DB     "GOSUB"
-1588   0737 42 
-1589   0738 82                          DWA(GOSUB)
-1589   0739 0A          
-1590   073A 52 45 54 55                 .DB     "RETURN"
-1590   073E 52 4E 
-1591   0740 82                          DWA(RETURN)
-1591   0741 2A          
-1592   0742 52 45 4D                    .DB     "REM"
-1593   0745 82                          DWA(REM)
-1593   0746 FB          
-1594   0747 46 4F 52                    .DB     "FOR"
-1595   074A 82                          DWA(FOR)
-1595   074B 43          
-1596   074C 49 4E 50 55                 .DB     "INPUT"
-1596   0750 54 
-1597   0751 83                          DWA(INPUT)
-1597   0752 18          
-1598   0753 50 52 49 4E                 .DB     "PRINT"
-1598   0757 54 
-1599   0758 81                          DWA(PRINT)
-1599   0759 BD          
-1600   075A 3F                          .DB     "?"
-1601   075B 81                          DWA(PRINT)
-1601   075C BD          
-1602   075D 53 54 4F 50                 .DB     "STOP"
-1603   0761 81                          DWA(STOP)
-1603   0762 71          
-1604   0763 48 41 4C 54                 .DB     "HALT"          ;HALT CPU (return to analyser)
-1605   0767 84                          DWA(HALT)
-1605   0768 C3          
-1606   0769 83                          DWA(DEFLT)      ;END OF LIST
-1606   076A 65          
-1607   076B             ;
-1608   076B             TAB4:           ;FUNCTIONS
-1609   076B 52 4E 44                    .DB     "RND"
-1610   076E 84                          DWA(RND)
-1610   076F 6D          
-1611   0770 41 42 53                    .DB     "ABS"
-1612   0773 84                          DWA(ABS)
-1612   0774 98          
-1613   0775 46 52 45 45                 .DB     "FREE"
-1614   0779 84                          DWA(FREE)
-1614   077A A1          
-1615   077B 50 45 45 4B                 .DB     "PEEK"          ;get byte from memory
-1616   077F 84                          DWA(PEEK)
-1616   0780 AE          
-1617   0781 44 45 45 4B                 .DB     "DEEK"          ;get word from memory
-1618   0785 84                          DWA(DEEK)
-1618   0786 B5          
-1619   0787 52 41 4D                    .DB     "RAM"           ;get RAM size
-1620   078A 84                          DWA(RAM)
-1620   078B BF          
-1621   078C 84                          DWA(XP40)       ;END OF LIST
-1621   078D 53          
-1622   078E             ;
-1623   078E             TAB5:           ;"TO" IN "FOR"
-1624   078E 54 4F                       .DB     "TO"
-1625   0790 82                          DWA(FR1)
-1625   0791 53          
-1626   0792 85                          DWA(QWHAT)      ;END OF LIST
-1626   0793 27          
-1627   0794             ;
-1628   0794             TAB6:           ;"STEP" IN "FOR"
-1629   0794 53 54 45 50                 .DB     "STEP"
-1630   0798 82                          DWA(FR2)
-1630   0799 5D          
-1631   079A 82                          DWA(FR3)        ;END OF LIST
-1631   079B 61          
-1632   079C             ;
-1633   079C             TAB8:           ;RELATION OPERATORS
-1634   079C 3E 3D                       .DB     ">="
-1635   079E 83                          DWA(XP11)
-1635   079F 7B          
-1636   07A0 21 3D                       .DB     "!="
-1637   07A2 83                          DWA(XP12)
-1637   07A3 81          
-1638   07A4 23                          .DB     "#"
-1639   07A5 83                          DWA(XP12)
-1639   07A6 81          
-1640   07A7 3E                          .DB     ">"
-1641   07A8 83                          DWA(XP13)
-1641   07A9 87          
-1642   07AA 3D 3D                       .DB     "=="
-1643   07AC 83                          DWA(XP15)
-1643   07AD 96          
-1644   07AE 3D                          .DB     "="
-1645   07AF 83                          DWA(XP15)
-1645   07B0 96          
-1646   07B1 3C 3D                       .DB     "<="
-1647   07B3 83                          DWA(XP14)
-1647   07B4 8E          
-1648   07B5 3C                          .DB     "<"
-1649   07B6 83                          DWA(XP16)
-1649   07B7 9C          
-1650   07B8 83                          DWA(XP17)       ;END OF REL OPERATOR LIST
-1650   07B9 A2          
-1651   07BA             ;
-1652   07BA 21 0D 07    DIRECT:         LD      HL,TAB1-1       ;*** DIRECT ***
-1653   07BD             ;
-1654   07BD             EXEC:           ;*** EXEC ***
-1655   07BD EF          EX0:            RST     RIGNBLK ;IGNORE LEADING BLANKS
-1656   07BE D5                          PUSH    DE      ;SAVE POINTER
-1657   07BF 1A          EX1:            LD      A,(DE)  ;IF FOUND '.' IN STRING
-1658   07C0 13                          INC     DE      ;BEFORE ANY MISMATCH
-1659   07C1 FE 2E                       CP      2EH     ;WE DECLARE A MATCH
-1660   07C3 CA E8 07                    JP      Z,EX3
-1661   07C6 FE 61                       CP      'a'     ;< 'a' ?
-1662   07C8 DA D2 07                    JP      C,EXN   ;NO ALPHA CHAR
-1663   07CB FE 7B                       CP      'z'+1   ;> 'z'
-1664   07CD D2 D2 07                    JP      NC,EXN  ;NO ALPHA CHAR
-1665   07D0 E6 5F                       AND     5FH     ;MASK LOWER CASE TO UPPER CASE
-1666   07D2             EXN:
-1667   07D2 23                          INC     HL      ;HL->TABLE
-1668   07D3 BE                          CP      (HL)    ;IF MATCH, TEST NEXT
-1669   07D4 CA BF 07                    JP      Z,EX1
-1670   07D7 3E 7F                       LD      A,07FH  ;ELSE SEE IF BIT 7
-1671   07D9 1B                          DEC     DE      ;OF TABLE IS SET, WHICH
-1672   07DA BE                          CP      (HL)    ;IS THE JUMP ADDR. (HI)
-1673   07DB DA EF 07                    JP      C,EX5   ;C:YES, MATCHED
-1674   07DE 23          EX2:            INC     HL      ;NC:NO, FIND JUMP ADDR.
-1675   07DF BE                          CP      (HL)
-1676   07E0 D2 DE 07                    JP      NC,EX2
-1677   07E3 23                          INC     HL      ;BUMP TO NEXT TAB. ITEM
-1678   07E4 D1                          POP     DE      ;RESTORE STRING POINTER
-1679   07E5 C3 BD 07                    JP      EX0     ;TEST AGAINST NEXT ITEM
-1680   07E8 3E 7F       EX3:            LD      A,07FH  ;PARTIAL MATCH, FIND
-1681   07EA 23          EX4:            INC     HL      ;JUMP ADDR., WHICH IS
-1682   07EB BE                          CP      (HL)    ;FLAGGED BY BIT 7
-1683   07EC D2 EA 07                    JP      NC,EX4
-1684   07EF 7E          EX5:            LD      A,(HL)  ;LOAD HL WITH THE JUMP
-1685   07F0 23                          INC     HL      ;ADDRESS FROM THE TABLE
-1686   07F1 6E                          LD      L,(HL)
-1687   07F2             #IF             $ < 8000H
-1688   07F2 E6 7F                       AND     7FH     ;MASK OFF HIGH ADDRESS BIT
-1689   07F4             #ENDIF
-1690   07F4 67                          LD      H,A
-1691   07F5 F1                          POP     AF      ;CLEAN UP THE GARBAGE
-1692   07F6 E9                          JP      (HL)    ;AND WE GO DO IT
-1693   07F7             ;
-1694   07F7             LSTROM:                         ;ALL ABOVE CAN BE ROM
-1695   07F7             
-1696   07F7             ; Check if the program code overflows the ROM size
-1697   07F7             
-1698   07F7~            #IF $ > RAMBGN
-1699   07F7~                            .ECHO   "\n\n*** The ROM section is "
-1700   07F7~                            .ECHO   $ - RAMBGN
-1701   07F7~                            .ECHO   " bytes too long! ***\n\n\n"
-1702   07F7             #ENDIF
-1703   07F7             ;
-1704   07F7             ;
-1705   07F7             ;*************************************************************
-1706   07F7             
-1707   07F7             
-1708   0800                             .ORG            RAMBGN          ;HERE DOWN MUST BE RAM
-1709   0800             
-1710   0800             ;*************************************************************
-1711   0800             ;
-1712   0800             ;
-1713   0800             TXTBGN:
+0480   01E3 FE 02                       CP      2       ;IF BASE < 2?
+0481   01E5 DA F4 01                    JP      C,PR3   ;IGNORE IT
+0482   01E8 32 37 17                    LD      (PNBASE),A      ;IN PNBASE
+0483   01EB C3 F4 01                    JP      PR3     ;LOOK FOR MORE TO PRINT
+0484   01EE CD DD 05    PR1:            CALL    QTSTG   ;OR IS IT A STRING?
+0485   01F1 C3 06 02                    JP      PR8     ;IF NOT, MUST BE EXPR.
+0486   01F4 CF          PR3:            TSTC($2C,PR6)   ;IF ",", GO FIND NEXT
+0486   01F5 2C          
+0486   01F6 06          
+0487   01F7 CD 19 05                    CALL    FIN     ;IN THE LIST.
+0488   01FA C3 D6 01                    JP      PR0     ;LIST CONTINUES
+0489   01FD 3E 0A       PR6:            LD      A,10    ;END OF LIST REACHED
+0490   01FF 32 37 17                    LD      (PNBASE),A      ;RESET DEFAULT BASE
+0491   0202 CD 0E 00                    CALL    CRLF    ;LIST ENDS WITH CRLF
+0492   0205 F7                          RST     RFINISH ;FINISH
+0493   0206 DF          PR8:            RST     REXPR   ;EVALUATE THE EXPR
+0494   0207 C5                          PUSH    BC
+0495   0208 CD 10 06                    CALL    PRTNUM  ;PRINT THE VALUE
+0496   020B C1                          POP     BC
+0497   020C C3 F4 01                    JP      PR3     ;MORE TO PRINT?
+0498   020F             ;
+0499   020F             ;*************************************************************
+0500   020F             ;
+0501   020F             ; *** GOSUB *** & RETURN ***
+0502   020F             ;
+0503   020F             ; 'GOSUB EXPR;' OR 'GOSUB EXPR (CR)' IS LIKE THE 'GOTO'
+0504   020F             ; COMMAND, EXCEPT THAT THE CURRENT TEXT POINTER, STACK POINTER
+0505   020F             ; ETC. ARE SAVE SO THAT EXECUTION CAN BE CONTINUED AFTER THE
+0506   020F             ; SUBROUTINE 'RETURN'.  IN ORDER THAT 'GOSUB' CAN BE NESTED
+0507   020F             ; (AND EVEN RECURSIVE), THE SAVE AREA MUST BE STACKED.
+0508   020F             ; THE STACK POINTER IS SAVED IN 'STKGOS', THE OLD 'STKGOS' IS
+0509   020F             ; SAVED IN THE STACK.  IF WE ARE IN THE MAIN ROUTINE, 'STKGOS'
+0510   020F             ; IS ZERO (THIS WAS DONE BY THE "MAIN" SECTION OF THE CODE),
+0511   020F             ; BUT WE STILL SAVE IT AS A FLAG FOR NO FURTHER 'RETURN'S.
+0512   020F             ;
+0513   020F             ; 'RETURN(CR)' UNDOS EVERYTHING THAT 'GOSUB' DID, AND THUS
+0514   020F             ; RETURN THE EXECUTION TO THE COMMAND AFTER THE MOST RECENT
+0515   020F             ; 'GOSUB'.  IF 'STKGOS' IS ZERO, IT INDICATES THAT WE
+0516   020F             ; NEVER HAD A 'GOSUB' AND IS THUS AN ERROR.
+0517   020F             ;
+0518   020F CD B6 06    GOSUB:          CALL    PUSHA   ;SAVE THE CURRENT "FOR"
+0519   0212 DF                          RST     REXPR   ;PARAMETERS
+0520   0213 D5                          PUSH    DE      ;AND TEXT POINTER
+0521   0214 CD A9 05                    CALL    FNDLN   ;FIND THE TARGET LINE
+0522   0217 C2 D6 00                    JP      NZ,AHOW ;NOT THERE. SAY "HOW?"
+0523   021A 2A 3A 17                    LD      HL,(CURRNT)     ;FOUND IT, SAVE OLD
+0524   021D E5                          PUSH    HL      ;'CURRNT' OLD 'STKGOS'
+0525   021E 2A 3C 17                    LD      HL,(STKGOS)
+0526   0221 E5                          PUSH    HL
+0527   0222 21 00 00                    LD      HL,0    ;AND LOAD NEW ONES
+0528   0225 22 42 17                    LD      (LOPVAR),HL
+0529   0228 39                          ADD     HL,SP
+0530   0229 22 3C 17                    LD      (STKGOS),HL
+0531   022C C3 86 01                    JP      RUNTSL  ;THEN RUN THAT LINE
+0532   022F CD 28 05    RETURN:         CALL    ENDCHK  ;THERE MUST BE A CR
+0533   0232 2A 3C 17                    LD      HL,(STKGOS)     ;OLD STACK POINTER
+0534   0235 7C                          LD      A,H     ;0 MEANS NOT EXIST
+0535   0236 B5                          OR      L
+0536   0237 CA 2C 05                    JP      Z,QWHAT ;SO, WE SAY: "WHAT?"
+0537   023A F9                          LD      SP,HL   ;ELSE, RESTORE IT
+0538   023B E1                          POP     HL
+0539   023C 22 3C 17                    LD      (STKGOS),HL     ;AND THE OLD 'STKGOS'
+0540   023F E1                          POP     HL
+0541   0240 22 3A 17                    LD      (CURRNT),HL     ;AND THE OLD 'CURRNT'
+0542   0243 D1                          POP     DE      ;OLD TEXT POINTER
+0543   0244 CD 9A 06                    CALL    POPA    ;OLD "FOR" PARAMETERS
+0544   0247 F7                          RST     RFINISH ;AND WE ARE BACK HOME
+0545   0248             ;
+0546   0248             ;*************************************************************
+0547   0248             ;
+0548   0248             ; *** FOR *** & NEXT ***
+0549   0248             ;
+0550   0248             ; 'FOR' HAS TWO FORMS:
+0551   0248             ; 'FOR VAR=EXP1 TO EXP2 STEP EXP3' AND 'FOR VAR=EXP1 TO EXP2'
+0552   0248             ; THE SECOND FORM MEANS THE SAME THING AS THE FIRST FORM WITH
+0553   0248             ; EXP3=1.  (I.E., WITH A STEP OF +1.)
+0554   0248             ; TBI WILL FIND THE VARIABLE VAR, AND SET ITS VALUE TO THE
+0555   0248             ; CURRENT VALUE OF EXP1.  IT ALSO EVALUATES EXP2 AND EXP3
+0556   0248             ; AND SAVE ALL THESE TOGETHER WITH THE TEXT POINTER ETC. IN
+0557   0248             ; THE 'FOR' SAVE AREA, WHICH CONSISTS OF 'LOPVAR', 'LOPINC',
+0558   0248             ; 'LOPLMT', 'LOPLN', AND 'LOPPT'.  IF THERE IS ALREADY SOME-
+0559   0248             ; THING IN THE SAVE AREA (THIS IS INDICATED BY A NON-ZERO
+0560   0248             ; 'LOPVAR'), THEN THE OLD SAVE AREA IS SAVED IN THE STACK
+0561   0248             ; BEFORE THE NEW ONE OVERWRITES IT.
+0562   0248             ; TBI WILL THEN DIG IN THE STACK AND FIND OUT IF THIS SAME
+0563   0248             ; VARIABLE WAS USED IN ANOTHER CURRENTLY ACTIVE 'FOR' LOOP.
+0564   0248             ; IF THAT IS THE CASE, THEN THE OLD 'FOR' LOOP IS DEACTIVATED.
+0565   0248             ; (PURGED FROM THE STACK..)
+0566   0248             ;
+0567   0248             ; 'NEXT VAR' SERVES AS THE LOGICAL (NOT NECESSARILLY PHYSICAL)
+0568   0248             ; END OF THE 'FOR' LOOP.  THE CONTROL VARIABLE VAR. IS CHECKED
+0569   0248             ; WITH THE 'LOPVAR'.  IF THEY ARE NOT THE SAME, TBI DIGS IN
+0570   0248             ; THE STACK TO FIND THE RIGHT ONE AND PURGES ALL THOSE THAT
+0571   0248             ; DID NOT MATCH.  EITHER WAY, TBI THEN ADDS THE 'STEP' TO
+0572   0248             ; THAT VARIABLE AND CHECK THE RESULT WITH THE LIMIT.  IF IT
+0573   0248             ; IS WITHIN THE LIMIT, CONTROL LOOPS BACK TO THE COMMAND
+0574   0248             ; FOLLOWING THE 'FOR'.  IF OUTSIDE THE LIMIT, THE SAVE AREA
+0575   0248             ; IS PURGED AND EXECUTION CONTINUES.
+0576   0248             ;
+0577   0248 CD B6 06    FOR:            CALL    PUSHA           ;SAVE THE OLD SAVE AREA
+0578   024B CD 06 05                    CALL    SETVAL          ;SET THE CONTROL VAR.
+0579   024E 2B                          DEC     HL              ;HL IS ITS ADDRESS
+0580   024F 22 42 17                    LD      (LOPVAR),HL     ;SAVE THAT
+0581   0252 21 92 07                    LD      HL,TAB5-1       ;USE 'EXEC' TO LOOK
+0582   0255 C3 C2 07                    JP      EXEC            ;FOR THE WORD 'TO'
+0583   0258 DF          FR1:            RST     REXPR           ;EVALUATE THE LIMIT
+0584   0259 22 46 17                    LD      (LOPLMT),HL     ;SAVE THAT
+0585   025C 21 98 07                    LD      HL,TAB6-1       ;USE 'EXEC' TO LOOK
+0586   025F C3 C2 07                    JP      EXEC            ;FOR THE WORD 'STEP'
+0587   0262 DF          FR2:            RST     REXPR           ;FOUND IT, GET STEP
+0588   0263 C3 69 02                    JP      FR4
+0589   0266 21 01 00    FR3:            LD      HL,1H           ;NOT FOUND, SET TO 1
+0590   0269 22 44 17    FR4:            LD      (LOPINC),HL     ;SAVE THAT TOO
+0591   026C 2A 3A 17    FR5:            LD      HL,(CURRNT)     ;SAVE CURRENT LINE #
+0592   026F 22 48 17                    LD      (LOPLN),HL
+0593   0272 EB                          EX      DE,HL           ;AND TEXT POINTER
+0594   0273 22 4A 17                    LD      (LOPPT),HL
+0595   0276 01 0A 00                    LD      BC,0AH          ;DIG INTO STACK TO
+0596   0279 2A 42 17                    LD      HL,(LOPVAR)     ;FIND 'LOPVAR'
+0597   027C EB                          EX      DE,HL
+0598   027D 60                          LD      H,B
+0599   027E 68                          LD      L,B             ;HL=0 NOW
+0600   027F 39                          ADD     HL,SP           ;HERE IS THE STACK
+0601   0280 3E                          .DB     3EH             ;SKIP "ADD HL,BC"
+0602   0281 09          FR7:            ADD     HL,BC           ;EACH LEVEL IS 10 DEEP
+0603   0282 7E                          LD      A,(HL)          ;GET THAT OLD 'LOPVAR'
+0604   0283 23                          INC     HL
+0605   0284 B6                          OR      (HL)
+0606   0285 CA A2 02                    JP      Z,FR8           ;0 SAYS NO MORE IN IT
+0607   0288 7E                          LD      A,(HL)
+0608   0289 2B                          DEC     HL
+0609   028A BA                          CP      D               ;SAME AS THIS ONE?
+0610   028B C2 81 02                    JP      NZ,FR7
+0611   028E 7E                          LD      A,(HL)          ;THE OTHER HALF?
+0612   028F BB                          CP      E
+0613   0290 C2 81 02                    JP      NZ,FR7
+0614   0293 EB                          EX      DE,HL           ;YES, FOUND ONE
+0615   0294 21 00 00                    LD      HL,0H
+0616   0297 39                          ADD     HL,SP           ;TRY TO MOVE SP
+0617   0298 44                          LD      B,H
+0618   0299 4D                          LD      C,L
+0619   029A 21 0A 00                    LD      HL,0AH
+0620   029D 19                          ADD     HL,DE
+0621   029E CD 8B 06                    CALL    MVDOWN          ;AND PURGE 10 WORDS
+0622   02A1 F9                          LD      SP,HL           ;IN THE STACK
+0623   02A2 2A 4A 17    FR8:            LD      HL,(LOPPT)      ;JOB DONE, RESTORE DE
+0624   02A5 EB                          EX      DE,HL
+0625   02A6 F7                          RST     RFINISH         ;AND CONTINUE
+0626   02A7             ;
+0627   02A7 FF          NEXT:           RST     RTSTV           ;GET ADDRESS OF VAR.
+0628   02A8 DA 2C 05                    JP      C,QWHAT         ;NO VARIABLE, "WHAT?"
+0629   02AB 22 3E 17                    LD      (VARNXT),HL     ;YES, SAVE IT
+0630   02AE D5          NX0:            PUSH    DE              ;SAVE TEXT POINTER
+0631   02AF EB                          EX      DE,HL
+0632   02B0 2A 42 17                    LD      HL,(LOPVAR)     ;GET VAR. IN 'FOR'
+0633   02B3 7C                          LD      A,H
+0634   02B4 B5                          OR      L               ;0 SAYS NEVER HAD ONE
+0635   02B5 CA 2D 05                    JP      Z,AWHAT         ;SO WE ASK: "WHAT?"
+0636   02B8 E7                          RST     RCOMP           ;ELSE WE CHECK THEM
+0637   02B9 CA C6 02                    JP      Z,NX3           ;OK, THEY AGREE
+0638   02BC D1                          POP     DE              ;NO, LET'S SEE
+0639   02BD CD 9A 06                    CALL    POPA            ;PURGE CURRENT LOOP
+0640   02C0 2A 3E 17                    LD      HL,(VARNXT)     ;AND POP ONE LEVEL
+0641   02C3 C3 AE 02                    JP      NX0             ;GO CHECK AGAIN
+0642   02C6 5E          NX3:            LD      E,(HL)          ;COME HERE WHEN AGREED
+0643   02C7 23                          INC     HL
+0644   02C8 56                          LD      D,(HL)          ;DE=VALUE OF VAR.
+0645   02C9 2A 44 17                    LD      HL,(LOPINC)
+0646   02CC E5                          PUSH    HL
+0647   02CD 7C                          LD      A,H
+0648   02CE AA                          XOR     D
+0649   02CF 7A                          LD      A,D
+0650   02D0 19                          ADD     HL,DE           ;ADD ONE STEP
+0651   02D1 FA D8 02                    JP      M,NX4
+0652   02D4 AC                          XOR     H
+0653   02D5 FA FA 02                    JP      M,NX5
+0654   02D8 EB          NX4:            EX      DE,HL
+0655   02D9 2A 42 17                    LD      HL,(LOPVAR)     ;PUT IT BACK
+0656   02DC 73                          LD      (HL),E
+0657   02DD 23                          INC     HL
+0658   02DE 72                          LD      (HL),D
+0659   02DF 2A 46 17                    LD      HL,(LOPLMT)     ;HL->LIMIT
+0660   02E2 F1                          POP     AF              ;OLD HL
+0661   02E3 B7                          OR      A
+0662   02E4 F2 E8 02                    JP      P,NX1           ;STEP > 0
+0663   02E7 EB                          EX      DE,HL           ;STEP < 0
+0664   02E8 CD FE 04    NX1:            CALL    CKHLDE          ;COMPARE WITH LIMIT
+0665   02EB D1                          POP     DE              ;RESTORE TEXT POINTER
+0666   02EC DA FC 02                    JP      C,NX2           ;OUTSIDE LIMIT
+0667   02EF 2A 48 17                    LD      HL,(LOPLN)      ;WITHIN LIMIT, GO
+0668   02F2 22 3A 17                    LD      (CURRNT),HL     ;BACK TO THE SAVED
+0669   02F5 2A 4A 17                    LD      HL,(LOPPT)      ;'CURRNT' AND TEXT
+0670   02F8 EB                          EX      DE,HL           ;POINTER
+0671   02F9 F7                          RST     RFINISH
+0672   02FA E1          NX5:            POP     HL
+0673   02FB D1                          POP     DE
+0674   02FC CD 9A 06    NX2:            CALL    POPA            ;PURGE THIS LOOP
+0675   02FF F7                          RST     RFINISH
+0676   0300             ;
+0677   0300             ;*************************************************************
+0678   0300             ;
+0679   0300             ; *** REM *** IF *** INPUT *** & LET (& DEFLT) ***
+0680   0300             ;
+0681   0300             ; 'REM' CAN BE FOLLOWED BY ANYTHING AND IS IGNORED BY TBI.
+0682   0300             ; TBI TREATS IT LIKE AN 'IF' WITH A FALSE CONDITION.
+0683   0300             ;
+0684   0300             ; 'IF' IS FOLLOWED BY AN EXPR. AS A CONDITION AND ONE OR MORE
+0685   0300             ; COMMANDS (INCLUDING OTHER 'IF'S) SEPERATED BY SEMI-COLONS.
+0686   0300             ; NOTE THAT THE WORD 'THEN' IS NOT USED.  TBI EVALUATES THE
+0687   0300             ; EXPR. IF IT IS NON-ZERO, EXECUTION CONTINUES.  IF THE
+0688   0300             ; EXPR. IS ZERO, THE COMMANDS THAT FOLLOWS ARE IGNORED AND
+0689   0300             ; EXECUTION CONTINUES AT THE NEXT LINE.
+0690   0300             ;
+0691   0300             ; 'INPUT' COMMAND IS LIKE THE 'PRINT' COMMAND, AND IS FOLLOWED
+0692   0300             ; BY A LIST OF ITEMS.  IF THE ITEM IS A STRING IN SINGLE OR
+0693   0300             ; DOUBLE QUOTES, OR IS A BACK-ARROW, IT HAS THE SAME EFFECT AS
+0694   0300             ; IN 'PRINT'.  IF AN ITEM IS A VARIABLE, THIS VARIABLE NAME IS
+0695   0300             ; PRINTED OUT FOLLOWED BY A COLON.  THEN TBI WAITS FOR AN
+0696   0300             ; EXPR. TO BE TYPED IN.  THE VARIABLE IS THEN SET TO THE
+0697   0300             ; VALUE OF THIS EXPR.  IF THE VARIABLE IS PROCEDED BY A STRING
+0698   0300             ; (AGAIN IN SINGLE OR DOUBLE QUOTES), THE STRING WILL BE
+0699   0300             ; PRINTED FOLLOWED BY A COLON.  TBI THEN WAITS FOR INPUT EXPR.
+0700   0300             ; AND SET THE VARIABLE TO THE VALUE OF THE EXPR.
+0701   0300             ;
+0702   0300             ; IF THE INPUT EXPR. IS INVALID, TBI WILL PRINT "WHAT?",
+0703   0300             ; "HOW?" OR "SORRY" AND REPRINT THE PROMPT AND REDO THE INPUT.
+0704   0300             ; THE EXECUTION WILL NOT TERMINATE UNLESS YOU TYPE CONTROL-C.
+0705   0300             ; THIS IS HANDLED IN 'INPERR'.
+0706   0300             ;
+0707   0300             ; 'LET' IS FOLLOWED BY A LIST OF ITEMS SEPERATED BY COMMAS.
+0708   0300             ; EACH ITEM CONSISTS OF A VARIABLE, AN EQUAL SIGN, AND AN EXPR.
+0709   0300             ; TBI EVALUATES THE EXPR. AND SET THE VARIABLE TO THAT VALUE.
+0710   0300             ; TBI WILL ALSO HANDLE 'LET' COMMAND WITHOUT THE WORD 'LET'.
+0711   0300             ; THIS IS DONE BY 'DEFLT'.
+0712   0300             ;
+0713   0300 21 00 00    REM:            LD      HL,0H   ;*** REM ***
+0714   0303 3E          .DB             3EH             ;SKIP RST, THIS IS LIKE 'IF 0'
+0715   0304             ;
+0716   0304 DF          IFF:            RST     REXPR   ;*** IF ***
+0717   0305 7C                          LD      A,H     ;IS THE EXPR.=0?
+0718   0306 B5                          OR      L
+0719   0307 C2 8D 01                    JP      NZ,RUNSML       ;NO, CONTINUE
+0720   030A CD C7 05                    CALL    FNDSKP  ;YES, SKIP REST OF LINE
+0721   030D D2 86 01                    JP      NC,RUNTSL       ;AND RUN THE NEXT LINE
+0722   0310 C3 F0 00                    JP      RSTART  ;IF NO NEXT, RE-START
+0723   0313             ;
+0724   0313 2A 40 17    INPERR:         LD      HL,(STKINP)     ;*** INPERR ***
+0725   0316 F9                          LD      SP,HL   ;RESTORE OLD SP
+0726   0317 E1                          POP     HL      ;AND OLD 'CURRNT'
+0727   0318 22 3A 17                    LD      (CURRNT),HL
+0728   031B D1                          POP     DE      ;AND OLD TEXT POINTER
+0729   031C D1                          POP     DE      ;REDO INPUT
+0730   031D             ;
+0731   031D             INPUT:          ;*** INPUT ***
+0732   031D D5          IP1:            PUSH    DE      ;SAVE IN CASE OF ERROR
+0733   031E CD DD 05                    CALL    QTSTG   ;IS NEXT ITEM A STRING?
+0734   0321 C3 2B 03                    JP      IP2     ;NO
+0735   0324 FF                          RST     RTSTV   ;YES, BUT FOLLOWED BY A
+0736   0325 DA 62 03                    JP      C,IP4   ;VARIABLE?   NO.
+0737   0328 C3 3B 03                    JP      IP3     ;YES.  INPUT VARIABLE
+0738   032B D5          IP2:            PUSH    DE      ;SAVE FOR 'PRTSTG'
+0739   032C FF                          RST     RTSTV   ;MUST BE VARIABLE NOW
+0740   032D DA 2C 05                    JP      C,QWHAT ;"WHAT?" IT IS NOT?
+0741   0330 1A                          LD      A,(DE)  ;GET READY FOR 'PRTSTG'
+0742   0331 4F                          LD      C,A
+0743   0332 97                          SUB     A
+0744   0333 12                          LD      (DE),A
+0745   0334 D1                          POP     DE
+0746   0335 CD D1 05                    CALL    PRTSTG  ;PRINT STRING AS PROMPT
+0747   0338 79                          LD      A,C     ;RESTORE TEXT
+0748   0339 1B                          DEC     DE
+0749   033A 12                          LD      (DE),A
+0750   033B D5          IP3:            PUSH    DE      ;SAVE TEXT POINTER
+0751   033C EB                          EX      DE,HL
+0752   033D 2A 3A 17                    LD      HL,(CURRNT)     ;ALSO SAVE 'CURRNT'
+0753   0340 E5                          PUSH    HL
+0754   0341 21 1D 03                    LD      HL,IP1  ;A NEGATIVE NUMBER
+0755   0344 22 3A 17                    LD      (CURRNT),HL     ;AS A FLAG
+0756   0347 21 00 00                    LD      HL,0H   ;SAVE SP TOO
+0757   034A 39                          ADD     HL,SP
+0758   034B 22 40 17                    LD      (STKINP),HL
+0759   034E D5                          PUSH    DE      ;OLD HL
+0760   034F 3E 3A                       LD      A,':'   ;PRINT THIS TOO
+0761   0351 CD 60 05                    CALL    GETLN   ;AND GET A LINE
+0762   0354 11 4E 17                    LD      DE,BUFFER       ;POINTS TO BUFFER
+0763   0357 DF                          RST     REXPR   ;EVALUATE INPUT
+0764   0358             ;NOP                             ;CAN BE 'CALL ENDCHK'
+0765   0358             ;NOP
+0766   0358             ;NOP
+0767   0358 D1                          POP     DE      ;OK, GET OLD HL
+0768   0359 EB                          EX      DE,HL
+0769   035A 73                          LD      (HL),E  ;SAVE VALUE IN VAR.
+0770   035B 23                          INC     HL
+0771   035C 72                          LD      (HL),D
+0772   035D E1                          POP     HL      ;GET OLD 'CURRNT'
+0773   035E 22 3A 17                    LD      (CURRNT),HL
+0774   0361 D1                          POP     DE      ;AND OLD TEXT POINTER
+0775   0362 F1          IP4:            POP     AF      ;PURGE JUNK IN STACK
+0776   0363 CF                          TSTC($2C,IP5)   ;IS NEXT CH. ','?
+0776   0364 2C          
+0776   0365 03          
+0777   0366 C3 1D 03                    JP      IP1     ;YES, MORE ITEMS.
+0778   0369 F7          IP5:            RST     RFINISH
+0779   036A             ;
+0780   036A 1A          DEFLT:          LD      A,(DE)  ;***  DEFLT ***
+0781   036B FE 0D                       CP      CR      ;EMPTY LINE IS OK
+0782   036D CA 79 03                    JP      Z,LT1   ;ELSE IT IS 'LET'
+0783   0370             ;
+0784   0370 CD 06 05    LET:            CALL    SETVAL  ;*** LET ***
+0785   0373 CF                          TSTC($2C,LT1)   ;SET VALUE TO VAR.
+0785   0374 2C          
+0785   0375 03          
+0786   0376 C3 70 03                    JP      LET     ;ITEM BY ITEM
+0787   0379 F7          LT1:            RST     RFINISH ;UNTIL FINISH
+0788   037A             ;
+0789   037A             ;*************************************************************
+0790   037A             ;
+0791   037A             ; *** EXPR ***
+0792   037A             ;
+0793   037A             ; 'EXPR' EVALUATES ARITHMETICAL OR LOGICAL EXPRESSIONS.
+0794   037A             ; <EXPR>::<EXPR2>
+0795   037A             ;         <EXPR2><REL.OP.><EXPR2>
+0796   037A             ; WHERE <REL.OP.> IS ONE OF THE OPERATORS IN TAB8 AND THE
+0797   037A             ; RESULT OF THESE OPERATIONS IS 1 IF TRUE AND 0 IF FALSE.
+0798   037A             ; <EXPR2>::=(+ OR -)<EXPR3>(+ OR -<EXPR3>)(....)
+0799   037A             ; WHERE () ARE OPTIONAL AND (....) ARE OPTIONAL REPEATS.
+0800   037A             ; <EXPR3>::=<EXPR4>(* OR /><EXPR4>)(....)
+0801   037A             ; <EXPR4>::=<VARIABLE>
+0802   037A             ;           <FUNCTION>
+0803   037A             ;           (<EXPR>)
+0804   037A             ; <EXPR> IS RECURSIVE SO THAT VARIABLE '@' CAN HAVE AN <EXPR>
+0805   037A             ; AS INDEX, FUNCTIONS CAN HAVE AN <EXPR> AS ARGUMENTS, AND
+0806   037A             ; <EXPR4> CAN BE AN <EXPR> IN PARANTHESE.
+0807   037A             ;
+0808   037A             ;EXPR:          CALL    EXPR2   ;THIS IS AT LOC. 18
+0809   037A             ;               PUSH    HL      ;SAVE <EXPR2> VALUE
+0810   037A             ;               JP      EXPR1   ;REST OF IT AT EXPR1
+0811   037A 21 A0 07    EXPR1:          LD      HL,TAB8-1       ;LOOKUP REL.OP.
+0812   037D C3 C2 07                    JP      EXEC    ;GO DO IT
+0813   0380             ;
+0814   0380 CD A9 03    XP11:           CALL    XP18    ;REL.OP.">="
+0815   0383 D8                          RET     C       ;NO, RETURN HL=0
+0816   0384 6F                          LD      L,A     ;YES, RETURN HL=1
+0817   0385 C9                          RET
+0818   0386             ;
+0819   0386 CD A9 03    XP12:           CALL    XP18    ;REL.OP."#"
+0820   0389 C8                          RET     Z       ;FALSE, RETURN HL=0
+0821   038A 6F                          LD      L,A     ;TRUE, RETURN HL=1
+0822   038B C9                          RET
+0823   038C             ;
+0824   038C CD A9 03    XP13:           CALL    XP18    ;REL.OP.">"
+0825   038F C8                          RET     Z       ;FALSE
+0826   0390 D8                          RET     C       ;ALSO FALSE, HL=0
+0827   0391 6F                          LD      L,A     ;TRUE, HL=1
+0828   0392 C9                          RET
+0829   0393             ;
+0830   0393 CD A9 03    XP14:           CALL    XP18    ;REL.OP."<="
+0831   0396 6F                          LD      L,A     ;SET HL=1
+0832   0397 C8                          RET     Z       ;REL. TRUE, RETURN
+0833   0398 D8                          RET     C
+0834   0399 6C                          LD      L,H     ;ELSE SET HL=0
+0835   039A C9                          RET
+0836   039B             ;
+0837   039B CD A9 03    XP15:           CALL    XP18    ;REL.OP."="
+0838   039E C0                          RET     NZ      ;FALSE, RETURN HL=0
+0839   039F 6F                          LD      L,A     ;ELSE SET HL=1
+0840   03A0 C9                          RET
+0841   03A1             ;
+0842   03A1 CD A9 03    XP16:           CALL    XP18    ;REL.OP."<"
+0843   03A4 D0                          RET     NC      ;FALSE, RETURN HL=0
+0844   03A5 6F                          LD      L,A     ;ELSE SET HL=1
+0845   03A6 C9                          RET
+0846   03A7             ;
+0847   03A7 E1          XP17:           POP     HL      ;NOT .REL.OP
+0848   03A8 C9                          RET             ;RETURN HL=<EXPR2>
+0849   03A9             ;
+0850   03A9 79          XP18:           LD      A,C     ;SUBROUTINE FOR ALL
+0851   03AA E1                          POP     HL      ;REL.OP.'S
+0852   03AB C1                          POP     BC
+0853   03AC E5                          PUSH    HL      ;REVERSE TOP OF STACK
+0854   03AD C5                          PUSH    BC
+0855   03AE 4F                          LD      C,A
+0856   03AF CD BE 03                    CALL    EXPR2   ;GET 2ND <EXPR2>
+0857   03B2 EB                          EX      DE,HL   ;VALUE IN DE NOW
+0858   03B3 E3                          EX      (SP),HL ;1ST <EXPR2> IN HL
+0859   03B4 CD FE 04                    CALL    CKHLDE  ;COMPARE 1ST WITH 2ND
+0860   03B7 D1                          POP     DE      ;RESTORE TEXT POINTER
+0861   03B8 21 00 00                    LD      HL,0H   ;SET HL=0, A=1
+0862   03BB 3E 01                       LD      A,1
+0863   03BD C9                          RET
+0864   03BE             ;
+0865   03BE CF          EXPR2:          TSTC('-',XP21)  ;NEGATIVE SIGN?
+0865   03BF 2D          
+0865   03C0 06          
+0866   03C1 21 00 00                    LD      HL,0H   ;YES, FAKE '0-'
+0867   03C4 C3 E8 03                    JP      XP26    ;TREAT LIKE SUBTRACT
+0868   03C7             ;
+0869   03C7 CF          XP21:           TSTC('+',XP22)  ;POSITIVE SIGN? IGNORE
+0869   03C8 2B          
+0869   03C9 00          
+0870   03CA CD F2 03    XP22:           CALL    EXPR3   ;1ST <EXPR3>
+0871   03CD CF          XP23:           TSTC('+',XP25)  ;ADD?
+0871   03CE 2B          
+0871   03CF 15          
+0872   03D0 E5                          PUSH    HL      ;YES, SAVE VALUE
+0873   03D1 CD F2 03                    CALL    EXPR3   ;GET 2ND <EXPR3>
+0874   03D4 EB          XP24:           EX      DE,HL   ;2ND IN DE
+0875   03D5 E3                          EX      (SP),HL ;1ST IN HL
+0876   03D6 7C                          LD      A,H     ;COMPARE SIGN
+0877   03D7 AA                          XOR     D
+0878   03D8 7A                          LD      A,D
+0879   03D9 19                          ADD     HL,DE
+0880   03DA D1                          POP     DE      ;RESTORE TEXT POINTER
+0881   03DB FA CD 03                    JP      M,XP23  ;1ST AND 2ND SIGN DIFFER
+0882   03DE AC                          XOR     H       ;1ST AND 2ND SIGN EQUAL
+0883   03DF F2 CD 03                    JP      P,XP23  ;SO IS RESULT
+0884   03E2             ;
+0885   03E2 C3 D5 00                    JP      QHOW    ;ELSE WE HAVE OVERFLOW
+0886   03E5             ;
+0887   03E5 CF          XP25:           TSTC('-',XP42)  ;SUBTRACT?
+0887   03E6 2D          
+0887   03E7 86          
+0888   03E8 E5          XP26:           PUSH    HL      ;YES, SAVE 1ST <EXPR3>
+0889   03E9 CD F2 03                    CALL    EXPR3   ;GET 2ND <EXPR3>
+0890   03EC CD E9 04                    CALL    CHGSGN  ;NEGATE
+0891   03EF C3 D4 03                    JP      XP24    ;AND ADD THEM
+0892   03F2             ;
+0893   03F2 CD 52 04    EXPR3:          CALL    EXPR4   ;GET 1ST <EXPR4>
+0894   03F5 CF          XP31:           TSTC('*',XP34)  ;MULTIPLY?
+0894   03F6 2A          
+0894   03F7 2D          
+0895   03F8 E5                          PUSH    HL      ;YES, SAVE 1ST
+0896   03F9 CD 52 04                    CALL    EXPR4   ;AND GET 2ND <EXPR4>
+0897   03FC 06 00                       LD      B,0H    ;CLEAR B FOR SIGN
+0898   03FE CD E6 04                    CALL    CHKSGN  ;CHECK SIGN
+0899   0401 E3                          EX      (SP),HL ;1ST IN HL
+0900   0402 CD E6 04                    CALL    CHKSGN  ;CHECK SIGN OF 1ST
+0901   0405 EB                          EX      DE,HL
+0902   0406 E3                          EX      (SP),HL
+0903   0407 7C                          LD      A,H     ;IS HL > 255 ?
+0904   0408 B7                          OR      A
+0905   0409 CA 12 04                    JP      Z,XP32  ;NO
+0906   040C 7A                          LD      A,D     ;YES, HOW ABOUT DE
+0907   040D B2                          OR      D
+0908   040E EB                          EX      DE,HL   ;PUT SMALLER IN HL
+0909   040F C2 D6 00                    JP      NZ,AHOW ;ALSO >, WILL OVERFLOW
+0910   0412 7D          XP32:           LD      A,L     ;THIS IS DUMB
+0911   0413 21 00 00                    LD      HL,0H   ;CLEAR RESULT
+0912   0416 B7                          OR      A       ;ADD AND COUNT
+0913   0417 CA 44 04                    JP      Z,XP35
+0914   041A 19          XP33:           ADD     HL,DE
+0915   041B DA D6 00                    JP      C,AHOW  ;OVERFLOW
+0916   041E 3D                          DEC     A
+0917   041F C2 1A 04                    JP      NZ,XP33
+0918   0422 C3 44 04                    JP      XP35    ;FINISHED
+0919   0425             ;
+0920   0425 CF          XP34:           TSTC('/',XP42)  ;DIVIDE?
+0920   0426 2F          
+0920   0427 46          
+0921   0428 E5                          PUSH    HL      ;YES, SAVE 1ST <EXPR4>
+0922   0429 CD 52 04                    CALL    EXPR4   ;AND GET THE SECOND ONE
+0923   042C 06 00                       LD      B,0H    ;CLEAR B FOR SIGN
+0924   042E CD E6 04                    CALL    CHKSGN  ;CHECK SIGN OF 2ND
+0925   0431 E3                          EX      (SP),HL ;GET 1ST IN HL
+0926   0432 CD E6 04                    CALL    CHKSGN  ;CHECK SIGN OF 1ST
+0927   0435 EB                          EX      DE,HL
+0928   0436 E3                          EX      (SP),HL
+0929   0437 EB                          EX      DE,HL
+0930   0438 7A                          LD      A,D     ;DIVIDE BY 0?
+0931   0439 B3                          OR      E
+0932   043A CA D6 00                    JP      Z,AHOW  ;SAY "HOW?"
+0933   043D C5                          PUSH    BC      ;ELSE SAVE SIGN
+0934   043E CD C9 04                    CALL    DIVIDE  ;USE SUBROUTINE
+0935   0441 60                          LD      H,B     ;RESULT IN HL NOW
+0936   0442 69                          LD      L,C
+0937   0443 C1                          POP     BC      ;GET SIGN BACK
+0938   0444 D1          XP35:           POP     DE      ;AND TEXT POINTER
+0939   0445 7C                          LD      A,H     ;HL MUST BE +
+0940   0446 B7                          OR      A
+0941   0447 FA D5 00                    JP      M,QHOW  ;ELSE IT IS OVERFLOW
+0942   044A 78                          LD      A,B
+0943   044B B7                          OR      A
+0944   044C FC E9 04                    CALL    M,CHGSGN        ;CHANGE SIGN IF NEEDED
+0945   044F C3 F5 03                    JP      XP31    ;LOOK FOR MORE TERMS
+0946   0452             ;
+0947   0452 21 6F 07    EXPR4:          LD      HL,TAB4-1       ;FIND FUNCTION IN TAB4
+0948   0455 C3 C2 07                    JP      EXEC    ;AND GO DO IT
+0949   0458             ;
+0950   0458 FF          XP40:           RST     RTSTV   ;NO, NOT A FUNCTION
+0951   0459 DA 61 04                    JP      C,XP41  ;NOR A VARIABLE
+0952   045C 7E                          LD      A,(HL)  ;VARIABLE
+0953   045D 23                          INC     HL
+0954   045E 66                          LD      H,(HL)  ;VALUE IN HL
+0955   045F 6F                          LD      L,A
+0956   0460 C9                          RET
+0957   0461             ;
+0958   0461 CD 7E 00    XP41:           CALL    TSTNUM  ;OR IS IT A NUMBER
+0959   0464 78                          LD      A,B     ;# OF DIGIT
+0960   0465 B7                          OR      A
+0961   0466 C0                          RET     NZ      ;OK
+0962   0467 CF          PARN:           TSTC($28,XP43)  ; '('
+0962   0468 28          
+0962   0469 05          
+0963   046A DF                          RST     REXPR   ;"(EXPR)"
+0964   046B CF                          TSTC($29,XP43)  ; ')'
+0964   046C 29          
+0964   046D 01          
+0965   046E C9          XP42:           RET
+0966   046F C3 2C 05    XP43:           JP      QWHAT   ;ELSE SAY: "WHAT?"
+0967   0472             
+0968   0472 CD 67 04    RND:            CALL    PARN    ;*** RND(EXPR) ***
+0969   0475 7C                          LD      A,H     ;EXPR MUST BE +
+0970   0476 B7                          OR      A
+0971   0477 FA D5 00                    JP      M,QHOW
+0972   047A B5                          OR      L       ;AND NON-ZERO
+0973   047B CA D5 00                    JP      Z,QHOW
+0974   047E D5                          PUSH    DE      ;SAVE BOTH
+0975   047F E5                          PUSH    HL
+0976   0480 2A 4C 17                    LD      HL,(RANPNT)     ;GET MEMORY AS RANDOM
+0977   0483 11 FC 07                    LD      DE,LSTROM       ;NUMBER
+0978   0486 E7                          RST     RCOMP
+0979   0487 DA 8D 04                    JP      C,RA1   ;WRAP AROUND IF LAST
+0980   048A 21 00 00                    LD      HL,START
+0981   048D 5E          RA1:            LD      E,(HL)
+0982   048E 23                          INC     HL
+0983   048F 56                          LD      D,(HL)
+0984   0490 22 4C 17                    LD      (RANPNT),HL
+0985   0493 E1                          POP     HL
+0986   0494 EB                          EX      DE,HL
+0987   0495 C5                          PUSH    BC
+0988   0496 CD C9 04                    CALL    DIVIDE  ;RND(N)=MOD(M,N)+1
+0989   0499 C1                          POP     BC
+0990   049A D1                          POP     DE
+0991   049B 23                          INC     HL
+0992   049C C9                          RET
+0993   049D             
+0994   049D CD 67 04    ABS:            CALL    PARN    ;*** ABS(EXPR) ***
+0995   04A0 1B                          DEC     DE
+0996   04A1 CD E6 04                    CALL    CHKSGN  ;CHECK SIGN AND CHANGE IF HL < 0
+0997   04A4 13                          INC     DE
+0998   04A5 C9                          RET
+0999   04A6             
+1000   04A6 2A 38 17    FREE:           LD      HL,(TXTUNF)     ;*** RETURN FREE IN HL ***
+1001   04A9 D5                          PUSH    DE              ;GET THE NUMBER OF FREE
+1002   04AA EB                          EX      DE,HL           ;BYTES BETWEEN 'TXTUNF'
+1003   04AB 21 00 17                    LD      HL,TXTEND       ;AND 'TXTEND'
+1004   04AE CD DF 04                    CALL    SUBDE
+1005   04B1 D1                          POP     DE
+1006   04B2 C9                          RET
+1007   04B3             
+1008   04B3 CD 67 04    PEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
+1009   04B6 6E                          LD      L,(HL)  ;GET CONTENT OF (HL)
+1010   04B7 26 00                       LD      H,0     ;RETURN RESULT IN HL
+1011   04B9 C9                          RET
+1012   04BA             
+1013   04BA CD 67 04    DEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
+1014   04BD D5                          PUSH    DE
+1015   04BE 5E                          LD      E,(HL)  ;GET LOW CONTENT OF (HL)
+1016   04BF 23                          INC     HL
+1017   04C0 56                          LD      D,(HL)  ;GET HIGH CONTENT OF (HL)
+1018   04C1 EB                          EX      DE,HL   ;RETURN RESULT IN HL
+1019   04C2 D1                          POP     DE
+1020   04C3 C9                          RET
+1021   04C4             
+1022   04C4 21 00 10    RAM:            LD      HL,RAMSZE
+1023   04C7 C9                          RET
+1024   04C8             
+1025   04C8 76          HALT:           HALT            ;HALT CPU (return to analyser)
+1026   04C9             ;
+1027   04C9             ;*************************************************************
+1028   04C9             ;
+1029   04C9             ; *** DIVIDE *** SUBDE *** CHKSGN *** CHGSGN *** & CKHLDE ***
+1030   04C9             ;
+1031   04C9             ; 'DIVIDE' DIVIDES HL BY DE, RESULT IN BC, REMAINDER IN HL
+1032   04C9             ;
+1033   04C9             ; 'SUBDE' SUBSTRACTS DE FROM HL
+1034   04C9             ;
+1035   04C9             ; 'CHKSGN' CHECKS SIGN OF HL.  IF +, NO CHANGE.  IF -, CHANGE
+1036   04C9             ; SIGN AND FLIP SIGN OF B.
+1037   04C9             ;
+1038   04C9             ; 'CHGSGN' CHECKS SIGN N OF HL AND B UNCONDITIONALLY.
+1039   04C9             ;
+1040   04C9             ; 'CKHLDE' CHECKS SIGN OF HL AND DE.  IF DIFFERENT, HL AND DE
+1041   04C9             ; ARE INTERCHANGED.  IF SAME SIGN, NOT INTERCHANGED.  EITHER
+1042   04C9             ; CASE, HL DE ARE THEN COMPARED TO SET THE FLAGS.
+1043   04C9             ;
+1044   04C9 E5          DIVIDE:         PUSH    HL      ;*** DIVIDE ***
+1045   04CA 6C                          LD      L,H     ;DIVIDE H BY DE
+1046   04CB 26 00                       LD      H,0
+1047   04CD CD D4 04                    CALL    DV1
+1048   04D0 41                          LD      B,C     ;SAVE RESULT IN B
+1049   04D1 7D                          LD      A,L     ;(REMINDER+L)/DE
+1050   04D2 E1                          POP     HL
+1051   04D3 67                          LD      H,A
+1052   04D4 0E FF       DV1:            LD      C,0FFH  ;RESULT IN C
+1053   04D6 0C          DV2:            INC     C       ;DUMB ROUTINE
+1054   04D7 CD DF 04                    CALL    SUBDE   ;DIVIDE BY SUBTRACT
+1055   04DA D2 D6 04                    JP      NC,DV2  ;AND COUNT
+1056   04DD 19                          ADD     HL,DE
+1057   04DE C9                          RET
+1058   04DF             ;
+1059   04DF 7D          SUBDE:          LD      A,L     ;*** SUBDE ***
+1060   04E0 93                          SUB     E       ;SUBSTRACT DE FROM
+1061   04E1 6F                          LD      L,A     ;HL
+1062   04E2 7C                          LD      A,H
+1063   04E3 9A                          SBC     A,D
+1064   04E4 67                          LD      H,A
+1065   04E5 C9                          RET
+1066   04E6             ;
+1067   04E6 7C          CHKSGN:         LD      A,H     ;*** CHKSGN ***
+1068   04E7 B7                          OR      A       ;CHECK SIGN OF HL
+1069   04E8 F0                          RET     P       ;IF HL >=0 RETURN
+1070   04E9             ;
+1071   04E9 7C          CHGSGN:         LD      A,H     ;*** CHGSGN ***
+1072   04EA B5                          OR      L       ;CHECK VALUE OF HL
+1073   04EB C8                          RET     Z       ;IF HL == 0 RETURN
+1074   04EC             ;
+1075   04EC 7C                          LD      A,H
+1076   04ED F5                          PUSH    AF      ;SAVE SIGN
+1077   04EE 2F                          CPL             ;CHANGE SIGN OF HL
+1078   04EF 67                          LD      H,A
+1079   04F0 7D                          LD      A,L
+1080   04F1 2F                          CPL
+1081   04F2 6F                          LD      L,A
+1082   04F3 23                          INC     HL      ;HL = -HL
+1083   04F4 F1                          POP     AF      ;GET ORIGINAL SIGN
+1084   04F5 AC                          XOR     H       ;COMPARE
+1085   04F6 F2 D5 00                    JP      P,QHOW  ;ERROR IF SIGN UNCHANGED (HL=$8000)
+1086   04F9 78                          LD      A,B     ;AND ALSO FLIP B
+1087   04FA EE 80                       XOR     80H
+1088   04FC 47                          LD      B,A
+1089   04FD C9                          RET
+1090   04FE             
+1091   04FE 7C          CKHLDE:         LD      A,H
+1092   04FF AA                          XOR     D       ;SAME SIGN?
+1093   0500 F2 04 05                    JP      P,CK1   ;YES, COMPARE
+1094   0503 EB                          EX      DE,HL   ;NO, XCH AND COMP
+1095   0504 E7          CK1:            RST     RCOMP
+1096   0505 C9                          RET
+1097   0506             ;
+1098   0506             ;*************************************************************
+1099   0506             ;
+1100   0506             ; *** SETVAL *** FIN *** ENDCHK *** & ERROR (& FRIENDS) ***
+1101   0506             ;
+1102   0506             ; "SETVAL" EXPECTS A VARIABLE, FOLLOWED BY AN EQUAL SIGN AND
+1103   0506             ; THEN AN EXPR.  IT EVALUATES THE EXPR. AND SET THE VARIABLE
+1104   0506             ; TO THAT VALUE.
+1105   0506             ;
+1106   0506             ; "FIN" CHECKS THE END OF A COMMAND.  IF IT ENDED WITH ";",
+1107   0506             ; EXECUTION CONTINUES.  IF IT ENDED WITH A CR, IT FINDS THE
+1108   0506             ; NEXT LINE AND CONTINUE FROM THERE.
+1109   0506             ;
+1110   0506             ; "ENDCHK" CHECKS IF A COMMAND IS ENDED WITH CR.  THIS IS
+1111   0506             ; REQUIRED IN CERTAIN COMMANDS.  (GOTO, RETURN, AND STOP ETC.)
+1112   0506             ;
+1113   0506             ; "ERROR" PRINTS THE STRING POINTED BY DE (AND ENDS WITH CR).
+1114   0506             ; IT THEN PRINTS THE LINE POINTED BY 'CURRNT' WITH A "?"
+1115   0506             ; INSERTED AT WHERE THE OLD TEXT POINTER (SHOULD BE ON TOP
+1116   0506             ; OF THE STACK) POINTS TO.  EXECUTION OF TB IS STOPPED
+1117   0506             ; AND TBI IS RESTARTED.  HOWEVER, IF 'CURRNT' -> ZERO
+1118   0506             ; (INDICATING A DIRECT COMMAND), THE DIRECT COMMAND IS NOT
+1119   0506             ; PRINTED.  AND IF 'CURRNT' -> NEGATIVE # (INDICATING 'INPUT'
+1120   0506             ; COMMAND), THE INPUT LINE IS NOT PRINTED AND EXECUTION IS
+1121   0506             ; NOT TERMINATED BUT CONTINUED AT 'INPERR'.
+1122   0506             ;
+1123   0506             ; RELATED TO 'ERROR' ARE THE FOLLOWING:
+1124   0506             ; 'QWHAT' SAVES TEXT POINTER IN STACK AND GET MESSAGE "WHAT?"
+1125   0506             ; 'AWHAT' JUST GET MESSAGE "WHAT?" AND JUMP TO 'ERROR'.
+1126   0506             ; 'QSORRY' AND 'ASORRY' DO SAME KIND OF THING.
+1127   0506             ; 'AHOW' AND 'AHOW' IN THE ZERO PAGE SECTION ALSO DO THIS.
+1128   0506             ;
+1129   0506 FF          SETVAL:         RST     RTSTV   ;*** SETVAL ***
+1130   0507 DA 2C 05                    JP      C,QWHAT ;"WHAT?" NO VARIABLE
+1131   050A E5                          PUSH    HL      ;SAVE ADDRESS OF VAR.
+1132   050B CF                          TSTC('=',SV1)   ;PASS "=" SIGN
+1132   050C 3D          
+1132   050D 08          
+1133   050E DF                          RST     REXPR   ;EVALUATE EXPR.
+1134   050F 44                          LD      B,H     ;VALUE IS IN BC NOW
+1135   0510 4D                          LD      C,L
+1136   0511 E1                          POP     HL      ;GET ADDRESS
+1137   0512 71                          LD      (HL),C  ;SAVE VALUE
+1138   0513 23                          INC     HL
+1139   0514 70                          LD      (HL),B
+1140   0515 C9                          RET
+1141   0516 C3 2C 05    SV1:            JP      QWHAT   ;NO "=" SIGN
+1142   0519             
+1143   0519 CF          FIN:            TSTC(';',FI1)   ;*** FIN ***
+1143   051A 3B          
+1143   051B 04          
+1144   051C F1                          POP     AF      ;";", PURGE RET. ADDR.
+1145   051D C3 8D 01                    JP      RUNSML  ;CONTINUE SAME LINE
+1146   0520 CF          FI1:            TSTC(CR,FI2)    ;NOT ";", IS IT CR?
+1146   0521 0D          
+1146   0522 04          
+1147   0523 F1                          POP     AF      ;YES, PURGE RET. ADDR.
+1148   0524 C3 7D 01                    JP      RUNNXL  ;RUN NEXT LINE
+1149   0527 C9          FI2:            RET             ;ELSE RETURN TO CALLER
+1150   0528             
+1151   0528 EF          ENDCHK:         RST     RIGNBLK ;IGNBLK
+1152   0529 FE 0D                       CP      CR      ;END WITH CR?
+1153   052B C8                          RET     Z       ;OK, ELSE SAY: "WHAT?"
+1154   052C             ;
+1155   052C D5          QWHAT:          PUSH    DE      ;*** QWHAT ***
+1156   052D 11 E4 00    AWHAT:          LD      DE,WHAT ;*** AWHAT ***
+1157   0530 97          ERROR:          SUB     A       ;*** ERROR ***
+1158   0531 CD D1 05                    CALL    PRTSTG  ;PRINT 'WHAT?', 'HOW?'
+1159   0534 D1                          POP     DE      ;OR 'SORRY'
+1160   0535 1A                          LD      A,(DE)  ;SAVE THE CHARACTER
+1161   0536 F5                          PUSH    AF      ;AT WHERE OLD DE ->
+1162   0537 97                          SUB     A       ;AND PUT A 0 THERE
+1163   0538 12                          LD      (DE),A
+1164   0539 2A 3A 17                    LD      HL,(CURRNT)     ;GET CURRENT LINE #
+1165   053C E5                          PUSH    HL
+1166   053D 7E                          LD      A,(HL)  ;CHECK THE VALUE
+1167   053E 23                          INC     HL
+1168   053F B6                          OR      (HL)
+1169   0540 D1                          POP     DE
+1170   0541 CA F0 00                    JP      Z,RSTART        ;IF ZERO, JUST RESTART
+1171   0544 7E                          LD      A,(HL)  ;IF NEGATIVE,
+1172   0545 B7                          OR      A
+1173   0546 FA 13 03                    JP      M,INPERR        ;REDO INPUT
+1174   0549 CD 6A 06                    CALL    PRTLN   ;ELSE PRINT THE LINE
+1175   054C 1B                          DEC     DE      ;UPTO WHERE THE 0 IS
+1176   054D F1                          POP     AF      ;RESTORE THE CHARACTER
+1177   054E 12                          LD      (DE),A
+1178   054F 3E 3F                       LD      A,'?'   ;PRINT A "?"
+1179   0551 D7                          RST     ROUTC
+1180   0552 97                          SUB     A       ;AND THE REST OF THE
+1181   0553 CD D1 05                    CALL    PRTSTG  ;LINE
+1182   0556 C3 F0 00                    JP      RSTART  ;THEN RESTART
+1183   0559             ;
+1184   0559 D5          QSORRY:         PUSH    DE      ;*** QSORRY ***
+1185   055A 11 EA 00    ASORRY:         LD      DE,SORRY        ;*** ASORRY ***
+1186   055D C3 30 05                    JP      ERROR
+1187   0560             ;
+1188   0560             ;*************************************************************
+1189   0560             ;
+1190   0560             ; *** GETLN *** FNDLN (& FRIENDS) ***
+1191   0560             ;
+1192   0560             ; 'GETLN' READS A INPUT LINE INTO 'BUFFER'.  IT FIRST PROMPT
+1193   0560             ; THE CHARACTER IN A (GIVEN BY THE CALLER), THEN IT FILLS
+1194   0560             ; THE BUFFER AND ECHOS.  IT IGNORES LF'S AND NULLS, BUT STILL
+1195   0560             ; ECHOS THEM BACK.  RUB-OUT IS USED TO CAUSE IT TO DELETE
+1196   0560             ; THE LAST CHARACTER (IF THERE IS ONE), AND ALT-MOD IS USED TO
+1197   0560             ; CAUSE IT TO DELETE THE WHOLE LINE AND START IT ALL OVER.
+1198   0560             ; CR SIGNALS THE END OF A LINE, AND CAUSE 'GETLN' TO RETURN.
+1199   0560             ;
+1200   0560             ; 'FNDLN' FINDS A LINE WITH A GIVEN LINE # (IN HL) IN THE
+1201   0560             ; TEXT SAVE AREA.  DE IS USED AS THE TEXT POINTER.  IF THE
+1202   0560             ; LINE IS FOUND, DE WILL POINT TO THE BEGINNING OF THAT LINE
+1203   0560             ; (I.E., THE LOW BYTE OF THE LINE #), AND FLAGS ARE NC & Z.
+1204   0560             ; IF THAT LINE IS NOT THERE AND A LINE WITH A HIGHER LINE #
+1205   0560             ; IS FOUND, DE POINTS TO THERE AND FLAGS ARE NC & NZ.  IF
+1206   0560             ; WE REACHED THE END OF TEXT SAVE AREA AND CANNOT FIND THE
+1207   0560             ; LINE, FLAGS ARE C & NZ.
+1208   0560             ; 'FNDLN' WILL INITIALIZE DE TO THE BEGINNING OF THE TEXT SAVE
+1209   0560             ; AREA TO START THE SEARCH.  SOME OTHER ENTRIES OF THIS
+1210   0560             ; ROUTINE WILL NOT INITIALIZE DE AND DO THE SEARCH.
+1211   0560             ; 'FNDLNP' WILL START WITH DE AND SEARCH FOR THE LINE #.
+1212   0560             ; 'FNDNXT' WILL BUMP DE BY 2, FIND A CR AND THEN START SEARCH.
+1213   0560             ; 'FNDSKP' USE DE TO FIND A CR, AND THEN START SEARCH.
+1214   0560             ;
+1215   0560 D7          GETLN:          RST     ROUTC   ;*** GETLN ***
+1216   0561 11 4E 17                    LD      DE,BUFFER       ;PROMPT AND INIT.
+1217   0564 CD FA 06    GL1:            CALL    CHKIO   ;CHECK KEYBOARD
+1218   0567 CA 64 05                    JP      Z,GL1   ;NO INPUT, WAIT
+1219   056A FE 08                       CP      BS      ;BS, DELETE LAST CHARACTER?
+1220   056C CA 8E 05                    JP      Z,GL3   ;YES
+1221   056F FE 7F                       CP      DEL     ;DEL, DELETE LAST CHARACTER?
+1222   0571 CA 8E 05                    JP      Z,GL3   ;YES
+1223   0574 D7                          RST     ROUTC   ;INPUT, ECHO BACK
+1224   0575 FE 0A                       CP      LF      ;IGNORE LF
+1225   0577 CA 64 05                    JP      Z,GL1
+1226   057A B7                          OR      A       ;IGNORE NULL
+1227   057B CA 64 05                    JP      Z,GL1
+1228   057E FE 18                       CP      CAN     ;^X, DELETE THE WHOLE LINE?
+1229   0580 CA A1 05                    JP      Z,GL4   ;YES
+1230   0583 12                          LD      (DE),A  ;ELSE SAVE INPUT
+1231   0584 13                          INC     DE      ;AND BUMP POINTER
+1232   0585 FE 0D                       CP      CR      ;WAS IT CR?
+1233   0587 C8                          RET     Z       ;YES, END OF LINE
+1234   0588 7B                          LD      A,E     ;ELSE MORE FREE ROOM?
+1235   0589 FE 8E                       CP      BUFEND & 0FFH
+1236   058B C2 64 05                    JP      NZ,GL1  ;YES, GET NEXT INPUT
+1237   058E 7B          GL3:            LD      A,E     ;DELETE LAST CHARACTER
+1238   058F FE 4E                       CP      BUFFER & 0FFH   ;BUT DO WE HAVE ANY?
+1239   0591 CA A1 05                    JP      Z,GL4   ;NO, REDO WHOLE LINE
+1240   0594 1B                          DEC     DE      ;YES, BACKUP POINTER
+1241   0595 3E 08                       LD      A,BS    ;AND ECHO A BACKSPACE
+1242   0597 D7                          RST     ROUTC
+1243   0598 3E 20                       LD      A,' '   ;AND ECHO A BLANK
+1244   059A D7                          RST     ROUTC
+1245   059B 3E 08                       LD      A,BS    ;AND ECHO A BACKSPACE
+1246   059D D7                          RST     ROUTC
+1247   059E C3 64 05                    JP      GL1     ;GO GET NEXT INPUT
+1248   05A1 CD 0E 00    GL4:            CALL    CRLF    ;REDO ENTIRE LINE
+1249   05A4 3E 5E                       LD      A,'^'   ;CR, LF AND UP-ARROW
+1250   05A6 C3 60 05                    JP      GETLN
+1251   05A9             ;
+1252   05A9 7C          FNDLN:          LD      A,H     ;*** FNDLN ***
+1253   05AA B7                          OR      A       ;CHECK SIGN OF HL
+1254   05AB FA D5 00                    JP      M,QHOW  ;IT CANNOT BE -
+1255   05AE 11 00 08                    LD      DE,TXTBGN       ;INIT TEXT POINTER
+1256   05B1             ;
+1257   05B1             FNDLP:          ;*** FDLNP ***
+1258   05B1 E5          FL1:            PUSH    HL      ;SAVE LINE #
+1259   05B2 2A 38 17                    LD      HL,(TXTUNF)     ;CHECK IF WE PASSED END
+1260   05B5 2B                          DEC     HL
+1261   05B6 E7                          RST     RCOMP
+1262   05B7 E1                          POP     HL      ;GET LINE # BACK
+1263   05B8 D8                          RET     C       ;C,NZ PASSED END
+1264   05B9 1A                          LD      A,(DE)  ;WE DID NOT, GET BYTE 1
+1265   05BA 95                          SUB     L       ;IS THIS THE LINE?
+1266   05BB 47                          LD      B,A     ;COMPARE LOW ORDER
+1267   05BC 13                          INC     DE
+1268   05BD 1A                          LD      A,(DE)  ;GET BYTE 2
+1269   05BE 9C                          SBC     A,H     ;COMPARE HIGH ORDER
+1270   05BF DA C6 05                    JP      C,FL2   ;NO, NOT THERE YET
+1271   05C2 1B                          DEC     DE      ;ELSE WE EITHER FOUND
+1272   05C3 B0                          OR      B       ;IT, OR IT IS NOT THERE
+1273   05C4 C9                          RET     ;NC,Z:FOUND, NC,NZ:NO
+1274   05C5             ;
+1275   05C5             FNDNXT:         ;*** FNDNXT ***
+1276   05C5 13                          INC     DE      ;FIND NEXT LINE
+1277   05C6 13          FL2:            INC     DE      ;JUST PASSED BYTE 1 & 2
+1278   05C7             ;
+1279   05C7 1A          FNDSKP:         LD      A,(DE)  ;*** FNDSKP ***
+1280   05C8 FE 0D                       CP      CR      ;TRY TO FIND CR
+1281   05CA C2 C6 05                    JP      NZ,FL2  ;KEEP LOOKING
+1282   05CD 13                          INC     DE      ;FOUND CR, SKIP OVER
+1283   05CE C3 B1 05                    JP      FL1     ;CHECK IF END OF TEXT
+1284   05D1             ;
+1285   05D1             ;*************************************************************
+1286   05D1             ;
+1287   05D1             ; *** PRTSTG *** QTSTG *** PRTNUM *** & PRTLN ***
+1288   05D1             ;
+1289   05D1             ; 'PRTSTG' PRINTS A STRING POINTED BY DE.  IT STOPS PRINTING
+1290   05D1             ; AND RETURNS TO CALLER WHEN EITHER A CR IS PRINTED OR WHEN
+1291   05D1             ; THE NEXT BYTE IS THE SAME AS WHAT WAS IN A (GIVEN BY THE
+1292   05D1             ; CALLER).  OLD A IS STORED IN B, OLD B IS LOST.
+1293   05D1             ;
+1294   05D1             ; 'QTSTG' LOOKS FOR A BACK-ARROW, SINGLE QUOTE, OR DOUBLE
+1295   05D1             ; QUOTE.  IF NONE OF THESE, RETURN TO CALLER.  IF BACK-ARROW,
+1296   05D1             ; OUTPUT A CR WITHOUT A LF.  IF SINGLE OR DOUBLE QUOTE, PRINT
+1297   05D1             ; THE STRING IN THE QUOTE AND DEMANDS A MATCHING UNQUOTE.
+1298   05D1             ; AFTER THE PRINTING THE NEXT 3 BYTES OF THE CALLER IS SKIPPED
+1299   05D1             ; OVER (USUALLY A JUMP INSTRUCTION.
+1300   05D1             ;
+1301   05D1             ; 'PRTNUM' PRINTS THE NUMBER IN HL.  LEADING BLANKS ARE ADDED
+1302   05D1             ; IF NEEDED TO PAD THE NUMBER OF SPACES TO THE NUMBER IN C.
+1303   05D1             ; HOWEVER, IF THE NUMBER OF DIGITS IS LARGER THAN THE # IN
+1304   05D1             ; C, ALL DIGITS ARE PRINTED ANYWAY.  NEGATIVE SIGN IS ALSO
+1305   05D1             ; PRINTED AND COUNTED IN, POSITIVE SIGN IS NOT.
+1306   05D1             ;
+1307   05D1             ; 'PRTLN' PRINTS A SAVED TEXT LINE WITH LINE # AND ALL.
+1308   05D1             ;
+1309   05D1 47          PRTSTG:         LD      B,A     ;*** PRTSTG ***
+1310   05D2 1A          PS1:            LD      A,(DE)  ;GET A CHARACTER
+1311   05D3 13                          INC     DE      ;BUMP POINTER
+1312   05D4 B8                          CP      B       ;SAME AS OLD A?
+1313   05D5 C8                          RET     Z       ;YES, RETURN
+1314   05D6 D7                          RST     ROUTC   ;ELSE PRINT IT
+1315   05D7 FE 0D                       CP      CR      ;WAS IT A CR?
+1316   05D9 C2 D2 05                    JP      NZ,PS1  ;NO, NEXT
+1317   05DC C9                          RET             ;YES, RETURN
+1318   05DD             ;
+1319   05DD CF          QTSTG:          TSTC($22,QT3)   ;*** QTSTG ***
+1319   05DE 22          
+1319   05DF 0F          
+1320   05E0 3E 22                       LD      A,22H   ;IT IS A '"'
+1321   05E2 CD D1 05    QT1:            CALL    PRTSTG  ;PRINT UNTIL ANOTHER
+1322   05E5 FE 0D       QT1A:           CP      CR      ;WAS LAST ONE A CR?
+1323   05E7 E1                          POP     HL      ;RETURN ADDRESS
+1324   05E8 CA 7D 01                    JP      Z,RUNNXL        ;WAS CR, RUN NEXT LINE
+1325   05EB 23          QT2:            INC     HL      ;SKIP 3 BYTES ON RETURN
+1326   05EC 23                          INC     HL
+1327   05ED 23                          INC     HL
+1328   05EE E9                          JP      (HL)    ;RETURN
+1329   05EF CF          QT3:            TSTC($27,QT4)   ;IS IT A "'"?
+1329   05F0 27          
+1329   05F1 05          
+1330   05F2 3E 27                       LD      A,27H   ;YES, DO THE SAME
+1331   05F4 C3 E2 05                    JP      QT1     ;AS IN '"'
+1332   05F7 CF          QT4:            TSTC($5F,QT5)   ;IS IT UNDERLINE?
+1332   05F8 5F          
+1332   05F9 07          
+1333   05FA 3E 8D                       LD      A,08DH  ;YES, CR WITHOUT LF
+1334   05FC D7                          RST     ROUTC
+1335   05FD E1                          POP     HL      ;RETURN ADDRESS
+1336   05FE C3 EB 05                    JP      QT2
+1337   0601 CF          QT5:            TSTC(5EH,QT5)   ;RST 1, is it '^'?
+1337   0602 5E          
+1337   0603 FD          
+1338   0604 1A                          LD      A,(DE)
+1339   0605 EE 40                       XOR     40H
+1340   0607 CD 10 00                    CALL    OUTC
+1341   060A 1A                          LD      A,(DE)
+1342   060B 13                          INC     DE
+1343   060C C3 E5 05                    JP      QT1A
+1344   060F C9          QT6:            RET             ;NONE OF ABOVE
+1345   0610             
+1346   0610             PRTNUM:                         ;*** PRINT NUMBER IN HL ***
+1347   0610 3A 37 17                    LD      A,(PNBASE)      ;GET NUMBER BASE
+1348   0613 FE 10                       CP      16      ;HEX NUMBER?
+1349   0615 C2 1E 06                    JP      NZ,PN0  ;NO, CHECK SIGN
+1350   0618 06 24                       LD      B,'$'   ;PRINT LEADING '$'
+1351   061A 0D                          DEC     C       ;'$' TAKES SPACE
+1352   061B C3 29 06                    JP      PN1     ;HEX IS UNSIGNED
+1353   061E 06 00       PN0:            LD      B,0     ;NO PREFIX YET
+1354   0620 CD E6 04                    CALL    CHKSGN  ;CHECK SIGN
+1355   0623 F2 29 06                    JP      P,PN1   ;NO SIGN
+1356   0626 06 2D                       LD      B,'-'   ;B=SIGN
+1357   0628 0D                          DEC     C       ;'-' TAKES SPACE
+1358   0629 D5          PN1:            PUSH    DE
+1359   062A 3A 37 17                    LD      A,(PNBASE)
+1360   062D 5F                          LD      E,A
+1361   062E AF                          XOR     A
+1362   062F 57                          LD      D,A
+1363   0630 D5                          PUSH    DE      ;SAVE AS A FLAG
+1364   0631 0D                          DEC     C       ;C=SPACES
+1365   0632 C5                          PUSH    BC      ;SAVE SIGN & SPACE
+1366   0633 CD C9 04    PN2:            CALL    DIVIDE  ;DIVIDE HL BY NUMBER BASE
+1367   0636 78                          LD      A,B     ;RESULT 0?
+1368   0637 B1                          OR      C
+1369   0638 CA 43 06                    JP      Z,PN3   ;YES, WE GOT ALL
+1370   063B E3                          EX      (SP),HL ;NO, SAVE REMAINDER
+1371   063C 2D                          DEC     L       ;AND COUNT SPACE
+1372   063D E5                          PUSH    HL      ;HL IS OLD BC
+1373   063E 60                          LD      H,B     ;MOVE RESULT TO BC
+1374   063F 69                          LD      L,C
+1375   0640 C3 33 06                    JP      PN2     ;AND DIVIDE AGAIN
+1376   0643             ;
+1377   0643 C1          PN3:            POP     BC      ;WE GOT ALL DIGITS IN
+1378   0644 0D          PN4:            DEC     C       ;THE STACK
+1379   0645 79                          LD      A,C     ;LOOK AT SPACE COUNT
+1380   0646 B7                          OR      A
+1381   0647 FA 50 06                    JP      M,PN5   ;NO LEADING BLANKS
+1382   064A 3E 20                       LD      A,' '   ;LEADING BLANKS
+1383   064C D7                          RST     ROUTC
+1384   064D C3 44 06                    JP      PN4     ;MORE?
+1385   0650 78          PN5:            LD      A,B     ;PRINT SIGN OR '$'
+1386   0651 B7                          OR      A
+1387   0652 C4 10 00                    CALL    NZ,OUTC
+1388   0655 5D                          LD      E,L     ;LAST REMAINDER IN E
+1389   0656 3A 37 17    PN6:            LD      A,(PNBASE)      ;GET NUMBER BASE
+1390   0659 BB                          CP      E       ;IT IS FLAG FOR NO MORE
+1391   065A 7B                          LD      A,E     ;CHECK DIGIT IN E
+1392   065B D1                          POP     DE
+1393   065C C8                          RET     Z       ;IF SO, RETURN
+1394   065D FE 0A                       CP      10      ;0-9? < A hex?
+1395   065F DA 64 06                    JP      C,PN7   ;Skip Add 7
+1396   0662 C6 07                       ADD     A,'A'-'0'-10    ;Bring it up to ASCII A-F
+1397   0664 C6 30       PN7:            ADD     A,'0'   ;ELSE CONVERT TO ASCII
+1398   0666 D7                          RST     ROUTC   ;AND PRINT THE DIGIT
+1399   0667 C3 56 06                    JP      PN6     ;GO BACK FOR MORE
+1400   066A             
+1401   066A 3E 0A       PRTLN:          LD      A,10    ;SET 10 AS DEFAULT BASE
+1402   066C 32 37 17                    LD      (PNBASE),A      ;FOR PRTNUM
+1403   066F 1A                          LD      A,(DE)
+1404   0670 6F                          LD      L,A     ;LOW ORDER LINE #
+1405   0671 13                          INC     DE
+1406   0672 1A                          LD      A,(DE)  ;HIGH ORDER
+1407   0673 67                          LD      H,A
+1408   0674 13                          INC     DE
+1409   0675 0E 04                       LD      C,4     ;PRINT 4 DIGIT LINE #
+1410   0677 CD 10 06                    CALL    PRTNUM
+1411   067A 3E 20                       LD      A,' '   ;FOLLOWED BY A BLANK
+1412   067C D7                          RST     ROUTC
+1413   067D 97                          SUB     A       ;AND THEN THE NEXT
+1414   067E CD D1 05                    CALL    PRTSTG
+1415   0681 C9                          RET
+1416   0682             ;
+1417   0682             ;*************************************************************
+1418   0682             ;
+1419   0682             ; *** MVUP *** MVDOWN *** POPA *** & PUSHA ***
+1420   0682             ;
+1421   0682             ; 'MVUP' MOVES A BLOCK UP FROM WHERE DE-> TO WHERE BC-> UNTIL
+1422   0682             ; DE = HL
+1423   0682             ;
+1424   0682             ; 'MVDOWN' MOVES A BLOCK DOWN FROM WHERE DE-> TO WHERE HL->
+1425   0682             ; UNTIL DE = BC
+1426   0682             ;
+1427   0682             ; 'POPA' RESTORES THE 'FOR' LOOP VARIABLE SAVE AREA FROM THE
+1428   0682             ; STACK
+1429   0682             ;
+1430   0682             ; 'PUSHA' STACKS THE 'FOR' LOOP VARIABLE SAVE AREA INTO THE
+1431   0682             ; STACK
+1432   0682             ;
+1433   0682 E7          MVUP:           RST     RCOMP   ;*** MVUP ***
+1434   0683 C8                          RET     Z       ;DE = HL, RETURN
+1435   0684 1A                          LD      A,(DE)  ;GET ONE BYTE
+1436   0685 02                          LD      (BC),A  ;MOVE IT
+1437   0686 13                          INC     DE      ;INCREASE BOTH POINTERS
+1438   0687 03                          INC     BC
+1439   0688 C3 82 06                    JP      MVUP    ;UNTIL DONE
+1440   068B             ;
+1441   068B 78          MVDOWN:         LD      A,B     ;*** MVDOWN ***
+1442   068C 92                          SUB     D       ;TEST IF DE = BC
+1443   068D C2 93 06                    JP      NZ,MD1  ;NO, GO MOVE
+1444   0690 79                          LD      A,C     ;MAYBE, OTHER BYTE?
+1445   0691 93                          SUB     E
+1446   0692 C8                          RET     Z       ;YES, RETURN
+1447   0693 1B          MD1:            DEC     DE      ;ELSE MOVE A BYTE
+1448   0694 2B                          DEC     HL      ;BUT FIRST DECREASE
+1449   0695 1A                          LD      A,(DE)  ;BOTH POINTERS AND
+1450   0696 77                          LD      (HL),A  ;THEN DO IT
+1451   0697 C3 8B 06                    JP      MVDOWN  ;LOOP BACK
+1452   069A             ;
+1453   069A C1          POPA:           POP     BC      ;BC = RETURN ADDR.
+1454   069B E1                          POP     HL      ;RESTORE LOPVAR, BUT
+1455   069C 22 42 17                    LD      (LOPVAR),HL     ;=0 MEANS NO MORE
+1456   069F 7C                          LD      A,H
+1457   06A0 B5                          OR      L
+1458   06A1 CA B4 06                    JP      Z,PP1   ;YEP, GO RETURN
+1459   06A4 E1                          POP     HL      ;NOP, RESTORE OTHERS
+1460   06A5 22 44 17                    LD      (LOPINC),HL
+1461   06A8 E1                          POP     HL
+1462   06A9 22 46 17                    LD      (LOPLMT),HL
+1463   06AC E1                          POP     HL
+1464   06AD 22 48 17                    LD      (LOPLN),HL
+1465   06B0 E1                          POP     HL
+1466   06B1 22 4A 17                    LD      (LOPPT),HL
+1467   06B4 C5          PP1:            PUSH    BC      ;BC = RETURN ADDR.
+1468   06B5 C9                          RET
+1469   06B6             ;
+1470   06B6 21 8F 17    PUSHA:          LD      HL,STKLMT       ;*** PUSHA ***
+1471   06B9 CD E9 04                    CALL    CHGSGN
+1472   06BC C1                          POP     BC      ;BC=RETURN ADDRESS
+1473   06BD 39                          ADD     HL,SP   ;IS STACK NEAR THE TOP?
+1474   06BE D2 59 05                    JP      NC,QSORRY       ;YES, SORRY FOR THAT
+1475   06C1 2A 42 17                    LD      HL,(LOPVAR)     ;ELSE SAVE LOOP VAR'S
+1476   06C4 7C                          LD      A,H     ;BUT IF LOPVAR IS 0
+1477   06C5 B5                          OR      L       ;THAT WILL BE ALL
+1478   06C6 CA DC 06                    JP      Z,PU1
+1479   06C9 2A 4A 17                    LD      HL,(LOPPT)      ;ELSE, MORE TO SAVE
+1480   06CC E5                          PUSH    HL
+1481   06CD 2A 48 17                    LD      HL,(LOPLN)
+1482   06D0 E5                          PUSH    HL
+1483   06D1 2A 46 17                    LD      HL,(LOPLMT)
+1484   06D4 E5                          PUSH    HL
+1485   06D5 2A 44 17                    LD      HL,(LOPINC)
+1486   06D8 E5                          PUSH    HL
+1487   06D9 2A 42 17                    LD      HL,(LOPVAR)
+1488   06DC E5          PU1:            PUSH    HL
+1489   06DD C5                          PUSH    BC      ;BC = RETURN ADDR.
+1490   06DE C9                          RET
+1491   06DF             
+1492   06DF             ;*************************************************************
+1493   06DF             ;
+1494   06DF             ; *** OUTC *** CHKIO ***
+1495   06DF             ;
+1496   06DF             ; THESE ARE THE ONLY I/O ROUTINES IN TBI.
+1497   06DF             ; OUTC WILL OUTPUT THE BYTE IN A.
+1498   06DF             ; IF THAT IS A CR, A LF IS ALSO SEND OUT.
+1499   06DF             ; ONLY THE FLAGS MAY BE CHANGED AT RETURN.
+1500   06DF             ; ALL REGISTERS ARE RESTORED.
+1501   06DF             ;
+1502   06DF             ; 'CHKIO' CHECKS THE INPUT.  IF NO INPUT, IT WILL RETURN TO
+1503   06DF             ; THE CALLER WITH THE Z FLAG SET.  IF THERE IS INPUT, Z FLAG
+1504   06DF             ; IS CLEARED AND THE INPUT BYTE IS IN A.  HOWEVER, IF THE
+1505   06DF             ; INPUT IS A CONTROL-O, THE 'OCSW' SWITCH IS COMPLIMENTED, AND
+1506   06DF             ; Z FLAG IS RETURNED.  IF A CONTROL-C IS READ, 'CHKIO' WILL
+1507   06DF             ; RESTART TBI AND DO NOT RETURN TO THE CALLER.
+1508   06DF             ;
+1509   06DF             ;THIS IS AT LOC. 0
+1510   06DF             ;START:         LD      SP,STACK        ;*** COLD START ***
+1511   06DF             ;               LD      A,0FFH
+1512   06DF             ;               JP      INIT
+1513   06DF             
+1514   06DF 11 09 07    INIT:           LD      DE,MSG1
+1515   06E2 CD D1 05                    CALL    PRTSTG
+1516   06E5 21 00 00                    LD      HL,START
+1517   06E8 22 4C 17                    LD      (RANPNT),HL
+1518   06EB 21 00 08                    LD      HL,TXTBGN
+1519   06EE 22 38 17                    LD      (TXTUNF),HL
+1520   06F1 C3 F0 00                    JP      RSTART
+1521   06F4             
+1522   06F4             ;THIS IS AT LOC. 10
+1523   06F4             ;OUTC:          OUT     (IODATA),A      ;Out to data port
+1524   06F4             ;               CP      CR      ;WAS IT CR?
+1525   06F4             ;               RET     NZ      ;NO, FINISHED
+1526   06F4             ;               JP      OC1     ;REST OF THIS IS AT OC1
+1527   06F4 3E 0A       OC1:            LD      A,LF    ;YES, WE SEND LF TOO
+1528   06F6 D7                          RST     ROUTC   ;THIS IS RECURSIVE
+1529   06F7 3E 0D                       LD      A,CR    ;GET CR BACK IN A
+1530   06F9 C9                          RET
+1531   06FA             
+1532   06FA DB 02       CHKIO:          IN      A,(IOSTAT)      ;*** CHKIO ***
+1533   06FC E6 01                       AND     IO_RX_BIT       ;MASK STATUS BIT
+1534   06FE C8                          RET     Z       ;NOT READY, RETURN "Z"
+1535   06FF DB 01                       IN      A,(IODATA)      ;READY, READ DATA
+1536   0701 E6 7F                       AND     7FH     ;MASK BIT 7 OFF
+1537   0703 FE 03       CI0:            CP      03H     ;IS IT CONTROL-C?
+1538   0705 C0                          RET     NZ      ;NO, RETURN "NZ"
+1539   0706 C3 F0 00                    JP      RSTART  ;YES, RESTART TBI
+1540   0709             ;
+1541   0709 54 69 6E 79 MSG1:           .DB     "TinyBASIC"
+1541   070D 42 41 53 49 
+1541   0711 43 
+1542   0712 0D                          .DB     CR
+1543   0713             
+1544   0713             
+1545   0713             ;*************************************************************
+1546   0713             ;
+1547   0713             ; *** TABLES *** DIRECT *** & EXEC ***
+1548   0713             ;
+1549   0713             ; THIS SECTION OF THE CODE TESTS A STRING AGAINST A TABLE.
+1550   0713             ; WHEN A MATCH IS FOUND, CONTROL IS TRANSFERED TO THE SECTION
+1551   0713             ; OF CODE ACCORDING TO THE TABLE.
+1552   0713             ;
+1553   0713             ; AT 'EXEC', DE SHOULD POINT TO THE STRING AND HL SHOULD POINT
+1554   0713             ; TO THE TABLE-1.  AT 'DIRECT', DE SHOULD POINT TO THE STRING.
+1555   0713             ; HL WILL BE SET UP TO POINT TO TAB1-1, WHICH IS THE TABLE OF
+1556   0713             ; ALL DIRECT AND STATEMENT COMMANDS.
+1557   0713             ;
+1558   0713             ; A '.' IN THE STRING WILL TERMINATE THE TEST AND THE PARTIAL
+1559   0713             ; MATCH WILL BE CONSIDERED AS A MATCH.  E.G., 'P.', 'PR.',
+1560   0713             ; 'PRI.', 'PRIN.', OR 'PRINT' WILL ALL MATCH 'PRINT'.
+1561   0713             ;
+1562   0713             ; THE TABLE CONSISTS OF ANY NUMBER OF ITEMS.  EACH ITEM
+1563   0713             ; IS A STRING OF CHARACTERS WITH BIT 7 SET TO 0 AND
+1564   0713             ; A JUMP ADDRESS STORED HI-LOW WITH BIT 7 OF THE HIGH
+1565   0713             ; BYTE SET TO 1.
+1566   0713             ; This is done by the macro 'DWA'.
+1567   0713             ; If the program is executed from an address < 0x8000
+1568   0713             ; take care to mask this bit in program part 'EXEC'.
+1569   0713             ;
+1570   0713             ; END OF TABLE IS AN ITEM WITH A JUMP ADDRESS ONLY.  IF THE
+1571   0713             ; STRING DOES NOT MATCH ANY OF THE OTHER ITEMS, IT WILL
+1572   0713             ; MATCH THIS NULL ITEM AS DEFAULT.
+1573   0713             ;
+1574   0713             TAB1:           ;DIRECT COMMANDS
+1575   0713 4C 49 53 54                 .DB     "LIST"
+1576   0717 81                          DWA(LIST)
+1576   0718 A5          
+1577   0719 52 55 4E                    .DB     "RUN"
+1578   071C 81                          DWA(RUN)
+1578   071D 77          
+1579   071E 4E 45 57                    .DB     "NEW"
+1580   0721 81                          DWA(NEW)
+1580   0722 68          
+1581   0723             ;
+1582   0723             TAB2:           ;DIRECT/STATEMENT
+1583   0723 4E 45 58 54                 .DB     "NEXT"
+1584   0727 82                          DWA(NEXT)
+1584   0728 A7          
+1585   0729 4C 45 54                    .DB     "LET"
+1586   072C 83                          DWA(LET)
+1586   072D 70          
+1587   072E 49 46                       .DB     "IF"
+1588   0730 83                          DWA(IFF)
+1588   0731 04          
+1589   0732 47 4F 54 4F                 .DB     "GOTO"
+1590   0736 81                          DWA(GOTO)
+1590   0737 96          
+1591   0738 47 4F 53 55                 .DB     "GOSUB"
+1591   073C 42 
+1592   073D 82                          DWA(GOSUB)
+1592   073E 0F          
+1593   073F 52 45 54 55                 .DB     "RETURN"
+1593   0743 52 4E 
+1594   0745 82                          DWA(RETURN)
+1594   0746 2F          
+1595   0747 52 45 4D                    .DB     "REM"
+1596   074A 83                          DWA(REM)
+1596   074B 00          
+1597   074C 46 4F 52                    .DB     "FOR"
+1598   074F 82                          DWA(FOR)
+1598   0750 48          
+1599   0751 49 4E 50 55                 .DB     "INPUT"
+1599   0755 54 
+1600   0756 83                          DWA(INPUT)
+1600   0757 1D          
+1601   0758 50 52 49 4E                 .DB     "PRINT"
+1601   075C 54 
+1602   075D 81                          DWA(PRINT)
+1602   075E BD          
+1603   075F 3F                          .DB     "?"
+1604   0760 81                          DWA(PRINT)
+1604   0761 BD          
+1605   0762 53 54 4F 50                 .DB     "STOP"
+1606   0766 81                          DWA(STOP)
+1606   0767 71          
+1607   0768 48 41 4C 54                 .DB     "HALT"          ;HALT CPU (return to analyser)
+1608   076C 84                          DWA(HALT)
+1608   076D C8          
+1609   076E 83                          DWA(DEFLT)      ;END OF LIST
+1609   076F 6A          
+1610   0770             ;
+1611   0770             TAB4:           ;FUNCTIONS
+1612   0770 52 4E 44                    .DB     "RND"
+1613   0773 84                          DWA(RND)
+1613   0774 72          
+1614   0775 41 42 53                    .DB     "ABS"
+1615   0778 84                          DWA(ABS)
+1615   0779 9D          
+1616   077A 46 52 45 45                 .DB     "FREE"
+1617   077E 84                          DWA(FREE)
+1617   077F A6          
+1618   0780 50 45 45 4B                 .DB     "PEEK"          ;get byte from memory
+1619   0784 84                          DWA(PEEK)
+1619   0785 B3          
+1620   0786 44 45 45 4B                 .DB     "DEEK"          ;get word from memory
+1621   078A 84                          DWA(DEEK)
+1621   078B BA          
+1622   078C 52 41 4D                    .DB     "RAM"           ;get RAM size
+1623   078F 84                          DWA(RAM)
+1623   0790 C4          
+1624   0791 84                          DWA(XP40)       ;END OF LIST
+1624   0792 58          
+1625   0793             ;
+1626   0793             TAB5:           ;"TO" IN "FOR"
+1627   0793 54 4F                       .DB     "TO"
+1628   0795 82                          DWA(FR1)
+1628   0796 58          
+1629   0797 85                          DWA(QWHAT)      ;END OF LIST
+1629   0798 2C          
+1630   0799             ;
+1631   0799             TAB6:           ;"STEP" IN "FOR"
+1632   0799 53 54 45 50                 .DB     "STEP"
+1633   079D 82                          DWA(FR2)
+1633   079E 62          
+1634   079F 82                          DWA(FR3)        ;END OF LIST
+1634   07A0 66          
+1635   07A1             ;
+1636   07A1             TAB8:           ;RELATION OPERATORS
+1637   07A1 3E 3D                       .DB     ">="
+1638   07A3 83                          DWA(XP11)
+1638   07A4 80          
+1639   07A5 21 3D                       .DB     "!="
+1640   07A7 83                          DWA(XP12)
+1640   07A8 86          
+1641   07A9 23                          .DB     "#"
+1642   07AA 83                          DWA(XP12)
+1642   07AB 86          
+1643   07AC 3E                          .DB     ">"
+1644   07AD 83                          DWA(XP13)
+1644   07AE 8C          
+1645   07AF 3D 3D                       .DB     "=="
+1646   07B1 83                          DWA(XP15)
+1646   07B2 9B          
+1647   07B3 3D                          .DB     "="
+1648   07B4 83                          DWA(XP15)
+1648   07B5 9B          
+1649   07B6 3C 3D                       .DB     "<="
+1650   07B8 83                          DWA(XP14)
+1650   07B9 93          
+1651   07BA 3C                          .DB     "<"
+1652   07BB 83                          DWA(XP16)
+1652   07BC A1          
+1653   07BD 83                          DWA(XP17)       ;END OF REL OPERATOR LIST
+1653   07BE A7          
+1654   07BF             ;
+1655   07BF 21 12 07    DIRECT:         LD      HL,TAB1-1       ;*** DIRECT ***
+1656   07C2             ;
+1657   07C2             EXEC:           ;*** EXEC ***
+1658   07C2 EF          EX0:            RST     RIGNBLK ;IGNORE LEADING BLANKS
+1659   07C3 D5                          PUSH    DE      ;SAVE POINTER
+1660   07C4 1A          EX1:            LD      A,(DE)  ;IF FOUND '.' IN STRING
+1661   07C5 13                          INC     DE      ;BEFORE ANY MISMATCH
+1662   07C6 FE 2E                       CP      2EH     ;WE DECLARE A MATCH
+1663   07C8 CA ED 07                    JP      Z,EX3
+1664   07CB FE 61                       CP      'a'     ;< 'a' ?
+1665   07CD DA D7 07                    JP      C,EXN   ;NO ALPHA CHAR
+1666   07D0 FE 7B                       CP      'z'+1   ;> 'z'
+1667   07D2 D2 D7 07                    JP      NC,EXN  ;NO ALPHA CHAR
+1668   07D5 E6 5F                       AND     5FH     ;MASK LOWER CASE TO UPPER CASE
+1669   07D7             EXN:
+1670   07D7 23                          INC     HL      ;HL->TABLE
+1671   07D8 BE                          CP      (HL)    ;IF MATCH, TEST NEXT
+1672   07D9 CA C4 07                    JP      Z,EX1
+1673   07DC 3E 7F                       LD      A,07FH  ;ELSE SEE IF BIT 7
+1674   07DE 1B                          DEC     DE      ;OF TABLE IS SET, WHICH
+1675   07DF BE                          CP      (HL)    ;IS THE JUMP ADDR. (HI)
+1676   07E0 DA F4 07                    JP      C,EX5   ;C:YES, MATCHED
+1677   07E3 23          EX2:            INC     HL      ;NC:NO, FIND JUMP ADDR.
+1678   07E4 BE                          CP      (HL)
+1679   07E5 D2 E3 07                    JP      NC,EX2
+1680   07E8 23                          INC     HL      ;BUMP TO NEXT TAB. ITEM
+1681   07E9 D1                          POP     DE      ;RESTORE STRING POINTER
+1682   07EA C3 C2 07                    JP      EX0     ;TEST AGAINST NEXT ITEM
+1683   07ED 3E 7F       EX3:            LD      A,07FH  ;PARTIAL MATCH, FIND
+1684   07EF 23          EX4:            INC     HL      ;JUMP ADDR., WHICH IS
+1685   07F0 BE                          CP      (HL)    ;FLAGGED BY BIT 7
+1686   07F1 D2 EF 07                    JP      NC,EX4
+1687   07F4 7E          EX5:            LD      A,(HL)  ;LOAD HL WITH THE JUMP
+1688   07F5 23                          INC     HL      ;ADDRESS FROM THE TABLE
+1689   07F6 6E                          LD      L,(HL)
+1690   07F7             #IF             $ < 8000H
+1691   07F7 E6 7F                       AND     7FH     ;MASK OFF HIGH ADDRESS BIT
+1692   07F9             #ENDIF
+1693   07F9 67                          LD      H,A
+1694   07FA F1                          POP     AF      ;CLEAN UP THE GARBAGE
+1695   07FB E9                          JP      (HL)    ;AND WE GO DO IT
+1696   07FC             ;
+1697   07FC             LSTROM:                         ;ALL ABOVE CAN BE ROM
+1698   07FC             
+1699   07FC             ; Check if the program code overflows the ROM size
+1700   07FC             
+1701   07FC~            #IF $ > RAMBGN
+1702   07FC~                            .ECHO   "\n\n*** The ROM section is "
+1703   07FC~                            .ECHO   $ - RAMBGN
+1704   07FC~                            .ECHO   " bytes too long! ***\n\n\n"
+1705   07FC             #ENDIF
+1706   07FC             ;
+1707   07FC             ;
+1708   07FC             ;*************************************************************
+1709   07FC             
+1710   07FC             
+1711   0800                             .ORG            RAMBGN          ;HERE DOWN MUST BE RAM
+1712   0800             
+1713   0800             ;*************************************************************
 1714   0800             ;
-1715   1700                             .ORG            RAMBGN+RAMSZE-$100
-1716   1700             ;
-1717   1700             TXTEND:         .EQU            $               ;TEXT SAVE AREA ENDS
-1718   1700             ARRBGN:         .DS             2               ;VARIABLEs '@(0)', '@(1), @(2)
-1719   1702                                                             ;... stored top-down
-1720   1702                                                             ;i.e. &@(i) = TXTEND-2*i
-1721   1702             ;
-1722   1702             VARBGN:         .DS             2*26            ;VARIABLES 'A'..'Z'
-1723   1736             OCSW:           .DS             1               ;SWITCH FOR OUTPUT
-1724   1737             PNBASE:         .DS             1               ;BASE FOR PRTNUM
-1725   1738             TXTUNF:         .DS             2               ;->UNFILLED TEXT AREA
-1726   173A             CURRNT:         .DS             2               ;POINTS TO CURRENT LINE
-1727   173C             STKGOS:         .DS             2               ;SAVES SP IN 'GOSUB'
-1728   173E             VARNXT:         .DS             2               ;TEMP STORAGE
-1729   1740             STKINP:         .DS             2               ;SAVES SP IN 'INPUT'
-1730   1742             LOPVAR:         .DS             2               ;'FOR' LOOP SAVE AREA
-1731   1744             LOPINC:         .DS             2               ;INCREMENT
-1732   1746             LOPLMT:         .DS             2               ;LIMIT
-1733   1748             LOPLN:          .DS             2               ;LINE NUMBER
-1734   174A             LOPPT:          .DS             2               ;TEXT POINTER
-1735   174C             RANPNT:         .DS             2               ;RANDOM NUMBER POINTER
-1736   174E             BUFFER:         .DS             64              ;INPUT BUFFER
-1737   178E             BUFEND:         .DS             1               ;BUFFER ENDS
-1738   178F             STKLMT:         .DS             1               ;TOP LIMIT FOR STACK
-1739   1790             ;
-1740   1800                             .ORG            RAMBGN+RAMSZE   ;RAM END
-1741   1800             STACK:          .EQU            $               ;STACK STARTS HERE
-1742   1800             ;
-1743   1800                             .END
+1715   0800             ;
+1716   0800             TXTBGN:
+1717   0800             ;
+1718   1700                             .ORG            RAMBGN+RAMSZE-$100
+1719   1700             ;
+1720   1700             TXTEND:         .EQU            $               ;TEXT SAVE AREA ENDS
+1721   1700             ARRBGN:         .DS             2               ;VARIABLEs '@(0)', '@(1), @(2)
+1722   1702                                                             ;... stored top-down
+1723   1702                                                             ;i.e. &@(i) = TXTEND-2*i
+1724   1702             ;
+1725   1702             VARBGN:         .DS             2*26            ;VARIABLES 'A'..'Z'
+1726   1736             OCSW:           .DS             1               ;SWITCH FOR OUTPUT
+1727   1737             PNBASE:         .DS             1               ;BASE FOR PRTNUM
+1728   1738             TXTUNF:         .DS             2               ;->UNFILLED TEXT AREA
+1729   173A             CURRNT:         .DS             2               ;POINTS TO CURRENT LINE
+1730   173C             STKGOS:         .DS             2               ;SAVES SP IN 'GOSUB'
+1731   173E             VARNXT:         .DS             2               ;TEMP STORAGE
+1732   1740             STKINP:         .DS             2               ;SAVES SP IN 'INPUT'
+1733   1742             LOPVAR:         .DS             2               ;'FOR' LOOP SAVE AREA
+1734   1744             LOPINC:         .DS             2               ;INCREMENT
+1735   1746             LOPLMT:         .DS             2               ;LIMIT
+1736   1748             LOPLN:          .DS             2               ;LINE NUMBER
+1737   174A             LOPPT:          .DS             2               ;TEXT POINTER
+1738   174C             RANPNT:         .DS             2               ;RANDOM NUMBER POINTER
+1739   174E             BUFFER:         .DS             64              ;INPUT BUFFER
+1740   178E             BUFEND:         .DS             1               ;BUFFER ENDS
+1741   178F             STKLMT:         .DS             1               ;TOP LIMIT FOR STACK
+1742   1790             ;
+1743   1800                             .ORG            RAMBGN+RAMSZE   ;RAM END
+1744   1800             STACK:          .EQU            $               ;STACK STARTS HERE
+1745   1800             ;
+1746   1800                             .END

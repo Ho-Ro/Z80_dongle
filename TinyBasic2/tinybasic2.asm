@@ -477,6 +477,8 @@ PR0:            TSTC('#',PR5)   ;ELSE IS IT FORMAT?
 PR5:            TSTC('%',PR1)   ;ELSE IS IT PRTNUM BASE?
                 RST     REXPR   ;YES, EVALUATE EXPR.
                 LD      A,L     ;AND STORE THE LOW PART
+                CP      2       ;IF BASE < 2?
+                JP      C,PR3   ;IGNORE IT
                 LD      (PNBASE),A      ;IN PNBASE
                 JP      PR3     ;LOOK FOR MORE TO PRINT
 PR1:            CALL    QTSTG   ;OR IS IT A STRING?
