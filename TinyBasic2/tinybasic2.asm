@@ -991,7 +991,7 @@ RA1:            LD      E,(HL)
 
 ABS:            CALL    PARN    ;*** ABS(EXPR) ***
                 DEC     DE
-                CALL    CHKSGN  ;CHECK SIGN
+                CALL    CHKSGN  ;CHECK SIGN AND CHANGE IF HL < 0
                 INC     DE
                 RET
 
@@ -1004,9 +1004,8 @@ FREE:           LD      HL,(TXTUNF)     ;*** RETURN FREE IN HL ***
                 RET
 
 PEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
-                LD      A,(HL)  ;GET CONTENT OF (HL)
+                LD      L,(HL)  ;GET CONTENT OF (HL)
                 LD      H,0     ;RETURN RESULT IN HL
-                LD      L,A
                 RET
 
 DEEK:           CALL    PARN    ;*** PEEK(EXPR) ***
@@ -1065,19 +1064,23 @@ SUBDE:          LD      A,L     ;*** SUBDE ***
 ;
 CHKSGN:         LD      A,H     ;*** CHKSGN ***
                 OR      A       ;CHECK SIGN OF HL
-                RET     P       ;IF -, CHANGE SIGN
+                RET     P       ;IF HL >=0 RETURN
 ;
 CHGSGN:         LD      A,H     ;*** CHGSGN ***
-                PUSH    AF
+                OR      L       ;CHECK VALUE OF HL
+                RET     Z       ;IF HL == 0 RETURN
+;
+                LD      A,H
+                PUSH    AF      ;SAVE SIGN
                 CPL             ;CHANGE SIGN OF HL
                 LD      H,A
                 LD      A,L
                 CPL
                 LD      L,A
-                INC     HL
-                POP     AF
-                XOR     H
-                JP      P,QHOW
+                INC     HL      ;HL = -HL
+                POP     AF      ;GET ORIGINAL SIGN
+                XOR     H       ;COMPARE
+                JP      P,QHOW  ;ERROR IF SIGN UNCHANGED (HL=$8000)
                 LD      A,B     ;AND ALSO FLIP B
                 XOR     80H
                 LD      B,A
@@ -1338,21 +1341,22 @@ QT5:            TSTC(5EH,QT5)   ;RST 1, is it '^'?
                 JP      QT1A
 QT6:            RET             ;NONE OF ABOVE
 
-PRTNUM:         PUSH    DE      ;*** PRINT NUMBER IN HL ***
+PRTNUM:                         ;*** PRINT NUMBER IN HL ***
                 LD      A,(PNBASE)      ;GET NUMBER BASE
-                LD      D,0     ;16 BIT FOR DIVIDE
-                LD      E,A
-                LD      B,D     ;NO PREFIX YET
                 CP      16      ;HEX NUMBER?
                 JP      NZ,PN0  ;NO, CHECK SIGN
                 LD      B,'$'   ;PRINT LEADING '$'
                 DEC     C       ;'$' TAKES SPACE
                 JP      PN1     ;HEX IS UNSIGNED
-PN0:            CALL    CHKSGN  ;CHECK SIGN
+PN0:            LD      B,0     ;NO PREFIX YET
+                CALL    CHKSGN  ;CHECK SIGN
                 JP      P,PN1   ;NO SIGN
                 LD      B,'-'   ;B=SIGN
                 DEC     C       ;'-' TAKES SPACE
-PN1:            XOR     A
+PN1:            PUSH    DE
+                LD      A,(PNBASE)
+                LD      E,A
+                XOR     A
                 LD      D,A
                 PUSH    DE      ;SAVE AS A FLAG
                 DEC     C       ;C=SPACES
@@ -1716,9 +1720,9 @@ ARRBGN:         .DS             2               ;VARIABLEs '@(0)', '@(1), @(2)
                                                 ;... stored top-down
                                                 ;i.e. &@(i) = TXTEND-2*i
 ;
-VARBGN:         .DS             (2*26)          ;VARIABLES 'A'..'Z'
-PNBASE:         .DS             1               ;BASE FOR PRTNUM
+VARBGN:         .DS             2*26            ;VARIABLES 'A'..'Z'
 OCSW:           .DS             1               ;SWITCH FOR OUTPUT
+PNBASE:         .DS             1               ;BASE FOR PRTNUM
 TXTUNF:         .DS             2               ;->UNFILLED TEXT AREA
 CURRNT:         .DS             2               ;POINTS TO CURRENT LINE
 STKGOS:         .DS             2               ;SAVES SP IN 'GOSUB'

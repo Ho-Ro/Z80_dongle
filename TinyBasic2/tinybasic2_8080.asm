@@ -43,7 +43,7 @@
 ; Memory map
 ROMBGN  .EQU $0000      ; Execution must start here
 RAMBGN  .EQU $0800      ; 2K ROM
-RAMSZE  .EQU $1800      ; 6K RAM
+RAMSZE  .EQU $1000      ; 4K RAM
 
 ; IO map
 IODATA  .EQU 1

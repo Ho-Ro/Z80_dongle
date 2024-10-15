@@ -483,7 +483,7 @@ int controlHandler() {
             runWithInterrupt( ramBegin, sizeof( RAM ) ); // returns with 'HALT' status
             while ( Serial.available() )                 // clear buffer
                 Serial.read();
-            break;                                       // go to analyser loop
+            break; // go to analyser loop
 
         case 'E':
             if ( opt == '0' )
@@ -626,8 +626,7 @@ int controlHandler() {
             if ( opt == 'X' ) {
                 isHex = true;
                 i = 2;
-            }
-            else if ( opt == 'A' ) {
+            } else if ( opt == 'A' ) {
                 asASCII = true;
                 i = 2;
             }
@@ -648,16 +647,17 @@ int controlHandler() {
                     end = ioLen - 1;
             }
             if ( isHex ) { //
-                for ( unsigned aaa = adr; aaa < end; aaa += 0x10 ) {
+                const int hexLen = 0x10;
+                for ( unsigned aaa = adr; aaa < end; aaa += hexLen ) {
                     if ( isRam )
-                        pf( F( ":10%04X00" ), aaa & ramMask );
+                        pf( F( ":%02X%04X00" ), hexLen, aaa & ramMask );
                     else
-                        pf( F( ".10%04X00" ), aaa & ioMask );
+                        pf( F( ".%02X%04X00" ), hexLen, aaa & ioMask );
                     unsigned char cs = 0;
-                    cs -= 0x10; // datalen
-                    cs -= (aaa)&0xFF;
+                    cs -= hexLen; // datalen
+                    cs -= aaa & 0xFF;
                     cs -= ( aaa >> 8 ) & 0x0F;
-                    for ( int j = 0; j < 0x10; j++ ) {
+                    for ( int j = 0; j < hexLen; j++ ) {
                         unsigned char val;
                         if ( isRam )
                             val = RAM[ ( aaa + j ) & ramMask ];
@@ -1149,14 +1149,14 @@ inline void DATA_PUT( uint8_t d ) {
 ISR( INT2_vect ) { // Handle RD
     WAIT_LOW();
     if ( zMREQ ) { // Handle MREQ
-        if ( ADDR_HI >= ramBeginHi ) {
-            if ( ADDR_HI <= ramEndHi ) { // RAM read
-                DATA_PUT( RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] ); // RAM
+        if ( ADDR_HI >= ramBeginHi ) { // RAM read
+            if ( ADDR_HI <= ramEndHi ) {
+                DATA_PUT( RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] );
             } else {
                 DATA_PUT( 0 );
             }
         } else { // ROM read
-            DATA_PUT( pgm_read_byte( ROM + (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) ) ); // ROM
+            DATA_PUT( pgm_read_byte( ROM + (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) ) );
         }
     } else if ( zIORQ ) {     // Handle IORQ
         if ( ADDR_LO == 1 ) { // Port 1 returns character from keyboard
@@ -1185,7 +1185,7 @@ ISR( INT2_vect ) { // Handle RD
 ISR( INT3_vect ) { // Handle WR
     WAIT_LOW();
     if ( zMREQ ) { // Handle MREQ
-        if ( ADDR_HI >= ramBeginHi && ADDR_HI <= ramEndHi ) { // Can only write into RAM
+        if ( ADDR_HI >= ramBeginHi && ADDR_HI <= ramEndHi ) {
             RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] = DATA_GET();
         }
     } else if ( zIORQ ) {                      // Handle IORQ
