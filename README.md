@@ -896,3 +896,30 @@ The SW is based on the Nascom Rom Basic:
 
 and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
 The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
+
+It can be started with the command `B`.
+
+## Palo Alto Tiny BASIC ##
+
+One of the first *Open Source* projects, written by [Li-Chen Wang](https://en.wikipedia.org/wiki/Li-Chen_Wang)
+who coined the term *"Copyleft"* to describe his concept. Tiny BASIC was created as a reaction to Bill Gates'
+[An Open Letter to Hobbyists](https://en.wikipedia.org/wiki/An_Open_Letter_to_Hobbyists)
+in which Gates emphasised his view that hobbyists who copied his *Altair BASIC* interpreter software
+were stealing from him personally.
+
+*Tiny BASIC* uses 16bit signed integer arithmetic with the operators `+`, `-`, `*`, `/`
+and nested parantheses, provides 26 variables `A` to `Z` and one array `@` that occupies
+the remaining free RAM space. The opiginal BASIC had only the functions `ABS(n)` and `RND(n)`,
+I added some HW-oriented functionality, like `PEEK(addr)`, `POKE addr,val,val,...`
+as well as hex constants written as `$xxxx` and the possibility to print in different
+number bases n=2..16 as unsigned int using the format specifier `%n`, e.g.
+`PRINT %16,expression,...`
+
+The Tiny BASIC interpreter uses 2K ROM and 6.5K RAM and can be started with the command `BT`.
+
+```
+TinyBASIC
+
+OK
+>
+```
