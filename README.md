@@ -909,17 +909,45 @@ were stealing from him personally.
 
 *Tiny BASIC* uses 16bit signed integer arithmetic with the operators `+`, `-`, `*`, `/`
 and nested parantheses, provides 26 variables `A` to `Z` and one array `@` that occupies
-the remaining free RAM space. The opiginal BASIC had only the functions `ABS(n)` and `RND(n)`,
-I added some HW-oriented functionality, like `PEEK(addr)`, `POKE addr,val,val,...`
+the remaining free RAM space. The opiginal BASIC only had the functions `ABS(n)` and `RND(n)`,
+I added some HW-oriented functionality, like `GET(addr)`, `PUT addr,val,val,...`
 as well as hex constants written as `$xxxx` and the possibility to print in different
 number bases n=2..16 as unsigned int using the format specifier `%n`, e.g.
-`PRINT %16,expression,...`
+`PRINT %16,expression,...` prints in unsigned hex up to the end of this `PRINT` statement.
+The BASIC statement `HALT` executes the Z80 opcode `HALT` with which the Arduino exits
+the execution loop and returns to the command input.
 
-The Tiny BASIC interpreter uses 2K ROM and 6.5K RAM and can be started with the command `BT`.
+The Tiny BASIC interpreter uses 2K ROM and 6.5K RAM and can be started with the command `BT`:
 
 ```
 TinyBASIC
 
 OK
 >
+```
+
+### Tiny BASIC examples ###
+
+This little code line uses my HW extensions to hex-dump the content of the program memory.
+
+```
+>10 for a=ram to top-size-1; print #4,%16,get(a),; next a
+>run
+   $A  $0 $66 $6F $72 $20 $61 $3D $72 $61 $6D $20 $74 $6F $20 $74
+  $6F $70 $2D $73 $69 $7A $65 $2D $31 $3B $20 $70 $72 $69 $6E $74
+  $20 $23 $34 $2C $25 $31 $36 $2C $67 $65 $74 $28 $61 $29 $2C $3B
+  $20 $6E $65 $78 $74 $20 $61  $D
+OK
+```
+
+This part puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it via the funtion `USR(123)`.
+
+```
+>put top,$23,$c9
+
+OK
+>print usr(123)
+     124
+
+OK
 ```

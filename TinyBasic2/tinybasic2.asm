@@ -14,7 +14,6 @@
 ;UART status port 2
 ;New:
 ;Case insensitive input
-;PEEK and DEEK
 ;PRINT modifier for hex out: PRINT %16,..
 ;Hex numbers: $xxxx
 ;2024-10-13 Ho-Ro:
@@ -24,7 +23,7 @@
 ;PRINT modifier %nn switches to unsigned number format, e.g.:
 ;PRINT %10,$FFFF -> 65535
 ;2024-10-17 Ho-Ro:
-;POKE ADDR, VAL, VAL, VAL,...
+;PUT ADDR, VAL, VAL, VAL,...
 ;constants RAM (TXTBGN), TOP (TXTEND) and SIZE (TXTEND-TXTUNF)
 ;function USR(para) that calls machine code at TOP (128 bytes free)
 ;with parameter in HL, returning the result in HL, default is RET at TOP
@@ -1026,7 +1025,7 @@ SIZE:           LD      HL,(TXTUNF)     ;*** RETURN SIZE IN HL ***
                 POP     DE
                 RET
 
-PEEK:           CALL    PARN    ;*** PEEK(ADDR) ***
+GET:            CALL    PARN    ;*** GET(ADDR) ***
                 LD      L,(HL)  ;GET CONTENT OF (HL)
                 LD      H,0     ;RETURN RESULT IN HL
                 RET
@@ -1051,22 +1050,21 @@ UNF:            LD      HL,(TXTUNF) ; *** UNF *** START OF UNFILLED TEXT AREA
                 RET
 
 
-POKE:           RST     REXPR   ;*** POKE ADDR, VAL1 [,VAL2, VAL3,..]
-                TSTCH($2C,PK2)  ; 1ST ',' SEPARATES THE VALUE(S)
+PUT:            RST     REXPR   ;*** PUT ADDR, VAL1 [,VAL2, VAL3,..]
+                TSTCH($2C,PT2)  ; 1ST ',' SEPARATES THE VALUE(S)
                 PUSH    HL      ;SAVE ADDR
-PK0:            RST     REXPR   ;GET VAL IN HL
+PT0:            RST     REXPR   ;GET VAL IN HL
                 LD      A,L     ;LOW BYTE OF VAL
                 POP     HL      ;GET ADDR
                 LD      (HL),A  ;PUT VALUE IN RAM
-                TSTCH($2C,PK1)  ;READY UNLESS ","
+                TSTCH($2C,PT1)  ;READY UNLESS ","
                 INC     HL      ;NEXT ADDR
                 PUSH    HL
-                JR      PK0     ;LIST CONTINUES
+                JR      PT0     ;LIST CONTINUES
 ;
-PK1:            RST     RFINISH ;READY
+PT1:            RST     RFINISH ;READY
 ;
-PK2:            ;POP     HL
-                JP      QWHAT   ;ELSE SAY: "WHAT?"
+PT2:            JP      QWHAT   ;ELSE SAY: "WHAT?"
 
 
 
@@ -1709,8 +1707,8 @@ TAB2:           ;DIRECT OR PROGRAM STATEMENT
                 DWA(PRINT)
                 .DB     "?"             ; short for PRINT
                 DWA(PRINT)
-                .DB     "POKE"          ; POKE ADDR, VAL, VAL,...
-                DWA(POKE)
+                .DB     "PUT"           ; PUT ADDR, VAL, VAL,...
+                DWA(PUT)
                 .DB     "STOP"          ; warm start
                 DWA(STOP)
                 .DB     "HALT"          ; HALT CPU (return to analyser)
@@ -1722,8 +1720,8 @@ TAB4:           ;FUNCTIONS AND CONSTANTS
                 DWA(RND)
                 .DB     "ABS"           ;fkt ABS(VALUE)
                 DWA(ABS)
-                .DB     "PEEK"          ;fkt PEEK(ADR) get byte from memory
-                DWA(PEEK)
+                .DB     "GET"          ;fkt GET(ADR) get byte from memory
+                DWA(GET)
                 .DB     "USR"           ;fkt USR(PARA) call usr fkt at TOP
                 DWA(USR)                ; and return a result in HL
                 .DB     "SIZE"          ;const SIZE - no parantesis, get free mem
