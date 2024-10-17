@@ -18,13 +18,17 @@
 ;PRINT modifier for hex out: PRINT %16,..
 ;Hex numbers: $xxxx
 ;2024-10-13 Ho-Ro:
-;build ROM version (2K ROM / 6.5K RAM) and RAM version (2K prog RAM / 4K free RAM)
-;change "SIZE" to "FREE" (free RAM), add command "RAM" (all RAM)
+;build ROM version (2K ROM / 6.5K RAM) and RAM version (2K prog RAM / 2K free RAM)
 ;add command "HALT" (halts Z80, returns to dongle analyser program)
 ;2024-10-15 Ho-Ro:
 ;PRINT modifier %nn switches to unsigned number format, e.g.:
 ;PRINT %10,$FFFF -> 65535
+;2024-10-17 Ho-Ro:
 ;POKE ADDR, VAL, VAL, VAL,...
+;constants RAM (TXTBGN), TOP (TXTEND) and SIZE (TXTEND-TXTUNF)
+;function USR(para) that calls machine code at TOP (128 bytes free)
+;with parameter in HL, returning the result in HL, default is RET at TOP
+;
 ;*************************************************************
 ;
 ;                 TINY BASIC FOR INTEL 8080
@@ -56,11 +60,11 @@ ROMBGN          .EQU            $0000           ; Execution must start here
 RAMBGN          .EQU            $0800           ; 2K ROM
 
 #IFDEF          MAKE_ROM
-; 2K CODE IN ROM and 6.5K DATA IN RAM
+; 2K CODE IN ROM and 6.5K DATA IN RAM FOR Z80_dongle
 RAMSZE          .EQU            $1A00
 #ELSE
-; 2K CODE IN RAM & 4K DATA IN RAM
-RAMSZE          .EQU            $1000
+; 2K CODE IN RAM & 2K DATA IN RAM AS TEST VERSION
+RAMSZE          .EQU            $0800
 #ENDIF
 
 ; IO map
@@ -137,16 +141,19 @@ TSTV:           RST     RIGNBLK ;IGNBLK
                 SUB     '@'     ;TEST VARIABLES
                 RET     C       ;C: < '@', NOT A VARIABLE
                 JP      NZ,TV1  ;NZ: NOT THE '@' ARRAY
+;
                 INC     DE      ;IT IS THE "@" ARRAY
                 CALL    PARN    ;@ SHOULD BE FOLLOWED
                 ADD     HL,HL   ;BY (EXPR) AS ITS INDEX
                 JP      C,QHOW  ;IS INDEX TOO BIG (>0x7FFF)?
+                INC     HL      ;ADD TWO BYTES
+                INC     HL      ;FOR @(0)
                 PUSH    DE      ;WILL IT OVERWRITE
                 EX      DE,HL   ;TEXT?
-                CALL    FREE    ;FIND SIZE OF FREE RAM
+                CALL    SIZE    ;FIND SIZE OF FREE RAM
                 RST     RCOMP   ;AND CHECK THAT
-                JP      C,ASORRY        ;IF SO, SAY "SORRY"
-                LD      HL,ARRBGN       ;IF NOT GET ADDRESS
+                JP      C,ASORRY  ;IF SO, SAY "SORRY"
+                LD      HL,TXTEND ;IF NOT GET ADDRESS
                 CALL    SUBDE   ;OF @(EXPR) AND PUT IT
                 POP     DE      ;IN HL (top-down from TXTEND)
                 RET             ;C FLAG IS CLEARED
@@ -297,7 +304,9 @@ SORRY:          .DB             "SORRY"
 ; THIS LOOP OR WHILE WE ARE INTERPRETING A DIRECT COMMAND
 ; (SEE NEXT SECTION). "CURRNT" SHOULD POINT TO A 0.
 ;
-RESTART:        LD      SP,STACK
+INIT1:          LD      A,$C9   ;PUT RET OPCODE
+                LD      (USRSPC),A ; AT USR CODE SPACE
+WSTART:         LD      SP,STACK
 ST1:            CALL    CRLF    ;AND JUMP TO HERE
                 LD      DE,OK   ;DE->STRING
                 SUB     A       ;A=0
@@ -345,7 +354,7 @@ ST4:            POP     BC      ;GET READY TO INSERT
                 POP     AF      ;THE LENGTH OF NEW LINE
                 PUSH    HL      ;IS 3 (LINE # AND CR)
                 CP      3       ;THEN DO NOT INSERT
-                JP      Z,RESTART       ;MUST CLEAR THE STACK
+                JP      Z,WSTART ;MUST CLEAR THE STACK
                 ADD     A,L     ;COMPUTE NEW TXTUNF
                 LD      L,A
                 LD      A,0
@@ -370,12 +379,12 @@ ST4:            POP     BC      ;GET READY TO INSERT
 ; SECTION.  AFTER THE COMMAND IS EXECUTED, CONTROL IS
 ; TRANSFERED TO OTHERS SECTIONS AS FOLLOWS:
 ;
-; FOR 'LIST', 'NEW', AND 'STOP': GO BACK TO 'RESTART'
+; FOR 'LIST', 'NEW', AND 'STOP': GO BACK TO 'WSTART'
 ; FOR 'RUN': GO EXECUTE THE FIRST STORED LINE IF ANY, ELSE
-; GO BACK TO 'RESTART'.
+; GO BACK TO 'WSTART'.
 ; FOR 'GOTO' AND 'GOSUB': GO EXECUTE THE TARGET LINE.
 ; FOR 'RETURN' AND 'NEXT': GO BACK TO SAVED RETURN LINE.
-; FOR ALL OTHERS: IF 'CURRENT' -> 0, GO TO 'RESTART', ELSE
+; FOR ALL OTHERS: IF 'CURRENT' -> 0, GO TO 'WSTART', ELSE
 ; GO EXECUTE NEXT COMMAND.  (THIS IS DONE IN 'FINISH'.)
 ;*************************************************************
 ;
@@ -383,7 +392,7 @@ ST4:            POP     BC      ;GET READY TO INSERT
 ;
 ; 'NEW(CR)' SETS 'TXTUNF' TO POINT TO 'TXTBGN'
 ;
-; 'STOP(CR)' GOES BACK TO 'RESTART'
+; 'STOP(CR)' GOES BACK TO 'WSTART'
 ;
 ; 'RUN(CR)' FINDS THE FIRST STORED LINE, STORE ITS ADDRESS (IN
 ; 'CURRENT'), AND START EXECUTE IT.  NOTE THAT ONLY THOSE
@@ -402,14 +411,14 @@ NEW:            CALL    ENDCHK  ;*** NEW(CR) ***
                 LD      (TXTUNF),HL
 ;
 STOP:           CALL    ENDCHK  ;*** STOP(CR) ***
-                JP      RESTART
+                JP      WSTART
 
 RUN:            CALL    ENDCHK  ;*** RUN(CR) ***
                 LD      DE,TXTBGN       ;FIRST SAVED LINE
 ;
 RUNNXL:         LD      HL,0    ;*** RUNNXL ***
                 CALL    FNDLP   ;FIND WHATEVER LINE #
-                JP      C,RESTART       ;C:PASSED TXTUNF, QUIT
+                JP      C,WSTART ;C:PASSED TXTUNF, QUIT
 ;
 RUNTSL:         EX      DE,HL   ;*** RUNTSL ***
                 LD      (CURRNT),HL     ;SET 'CURRENT'->LINE #
@@ -465,7 +474,7 @@ GOTO:           RST     REXPR   ;*** GOTO EXPR ***
 LIST:           CALL    TSTNUM  ;TEST IF THERE IS A #
                 CALL    ENDCHK  ;IF NO # WE GET A 0
                 CALL    FNDLN   ;FIND THIS OR NEXT LINE
-LS1:            JP      C,RESTART       ;C:PASSED TXTUNF
+LS1:            JP      C,WSTART ;C:PASSED TXTUNF
                 CALL    PRTLN   ;PRINT THE LINE
                 CALL    CHKIO   ;STOP IF HIT CONTROL-C
                 CALL    FNDLP   ;FIND NEXT LINE
@@ -731,7 +740,7 @@ IFF:            RST     REXPR   ;*** IF ***
                 JP      NZ,RUNSML       ;NO, CONTINUE
                 CALL    FNDSKP  ;YES, SKIP REST OF LINE
                 JP      NC,RUNTSL       ;AND RUN THE NEXT LINE
-                JP      RESTART ;IF NO NEXT, RE-START
+                JP      WSTART  ;IF NO NEXT, RE-START
 ;
 INPERR:         LD      HL,(STKINP)     ;*** INPERR ***
                 LD      SP,HL   ;RESTORE OLD SP
@@ -1009,7 +1018,7 @@ ABS:            CALL    PARN    ;*** ABS(EXPR) ***
                 INC     DE
                 RET
 
-FREE:           LD      HL,(TXTUNF)     ;*** RETURN FREE IN HL ***
+SIZE:           LD      HL,(TXTUNF)     ;*** RETURN SIZE IN HL ***
                 PUSH    DE              ;GET THE NUMBER OF FREE
                 EX      DE,HL           ;BYTES BETWEEN 'TXTUNF'
                 LD      HL,TXTEND       ;AND 'TXTEND'
@@ -1022,14 +1031,25 @@ PEEK:           CALL    PARN    ;*** PEEK(ADDR) ***
                 LD      H,0     ;RETURN RESULT IN HL
                 RET
 
-DEEK:           CALL    PARN    ;*** DEEK(ADDR) ***
-                PUSH    DE
-                LD      E,(HL)  ;GET LOW CONTENT OF (HL)
-                INC     HL
-                LD      D,(HL)  ;GET HIGH CONTENT OF (HL)
-                EX      DE,HL   ;RETURN RESULT IN HL
-                POP     DE
+USR:            CALL    PARN    ;*** USR(PARA) ***
+                JP      USRSPC  ;GET para in HL and JP to prog
+;                               ;There you should:
+;               ...             ;    - Do the work
+;               ...             ;    - Put result in HL
+;               RET             ;$C9 - RET to BASIC
+
+
+RAM:            LD      HL,TXTBGN ; *** RAM *** START OF TEXT AREA
                 RET
+
+
+TOP:            LD      HL,TXTEND ; *** TOP *** END OF TEXT AREA
+                RET
+
+
+UNF:            LD      HL,(TXTUNF) ; *** UNF *** START OF UNFILLED TEXT AREA
+                RET
+
 
 POKE:           RST     REXPR   ;*** POKE ADDR, VAL1 [,VAL2, VAL3,..]
                 TSTCH($2C,PK2)  ; 1ST ',' SEPARATES THE VALUE(S)
@@ -1049,8 +1069,6 @@ PK2:            ;POP     HL
                 JP      QWHAT   ;ELSE SAY: "WHAT?"
 
 
-RAM:            LD      HL,RAMSZE ; *** RAM ***
-                RET
 
 
 HALT:           HALT            ;HALT CPU (return to analyser)
@@ -1198,7 +1216,7 @@ ERROR:          SUB     A       ;*** ERROR ***
                 INC     HL
                 OR      (HL)
                 POP     DE
-                JP      Z,RESTART       ;IF ZERO, JUST RESTART
+                JP      Z,WSTART ;IF ZERO, JUST RESTART
                 LD      A,(HL)  ;IF NEGATIVE,
                 OR      A
                 JP      M,INPERR        ;REDO INPUT
@@ -1210,7 +1228,7 @@ ERROR:          SUB     A       ;*** ERROR ***
                 RST     ROUTC
                 SUB     A       ;AND THE REST OF THE
                 CALL    PRTSTG  ;LINE
-                JP      RESTART ;THEN RESTART
+                JP      WSTART  ;THEN RESTART
 ;
 QSORRY:         PUSH    DE      ;*** QSORRY ***
 ASORRY:         LD      DE,SORRY        ;*** ASORRY ***
@@ -1559,7 +1577,7 @@ INIT:           LD      DE,MSG1
                 LD      (RANPNT),HL
                 LD      HL,TXTBGN
                 LD      (TXTUNF),HL
-                JP      RESTART
+                JP      INIT1
 
 ;THIS IS AT LOC. 10
 ;OUTC:          OUT     (IODATA),A      ;Out to data port
@@ -1578,7 +1596,7 @@ CHKIO:          IN      A,(IOSTAT)      ;*** CHKIO ***
                 AND     7FH     ;MASK BIT 7 OFF
 CI0:            CP      03H     ;IS IT CONTROL-C?
                 RET     NZ      ;NO, RETURN "NZ"
-                JP      RESTART ;YES, RESTART TBI
+                JP      WSTART  ;YES, RESTART TBI
 ;
 MSG1:           .DB     "TinyBASIC"
                 .DB     CR
@@ -1671,7 +1689,7 @@ TAB1:           ;DIRECT ONLY COMMANDS
 TAB2:           ;DIRECT OR PROGRAM STATEMENT
                 .DB     "NEXT"
                 DWA(NEXT)
-                .DB     "LET"
+                .DB     "LET"           ; can be omitted
                 DWA(LET)
                 .DB     "IF"
                 DWA(IFF)
@@ -1685,33 +1703,35 @@ TAB2:           ;DIRECT OR PROGRAM STATEMENT
                 DWA(REM)
                 .DB     "FOR"
                 DWA(FOR)
-                .DB     "INPUT"
+                .DB     "INPUT"         ; wait for KBD input
                 DWA(INPUT)
                 .DB     "PRINT"
                 DWA(PRINT)
-                .DB     "?"
+                .DB     "?"             ; short for PRINT
                 DWA(PRINT)
                 .DB     "POKE"          ; POKE ADDR, VAL, VAL,...
                 DWA(POKE)
-                .DB     "STOP"
+                .DB     "STOP"          ; warm start
                 DWA(STOP)
-                .DB     "HALT"          ;HALT CPU (return to analyser)
+                .DB     "HALT"          ; HALT CPU (return to analyser)
                 DWA(HALT)
                 DWA(DEFLT)              ;END OF LIST
 ;
-TAB4:           ;FUNCTIONS
-                .DB     "RND"           ;RND(RANGE)
+TAB4:           ;FUNCTIONS AND CONSTANTS
+                .DB     "RND"           ;fkt RND(RANGE)
                 DWA(RND)
-                .DB     "ABS"           ;ABS(VALUE)
+                .DB     "ABS"           ;fkt ABS(VALUE)
                 DWA(ABS)
-                .DB     "FREE"          ;FREE - no parantesis, get free mem
-                DWA(FREE)
-                .DB     "PEEK"          ;PEEK(ADR) get byte from memory
+                .DB     "PEEK"          ;fkt PEEK(ADR) get byte from memory
                 DWA(PEEK)
-                .DB     "DEEK"          ;DEEK(ADR) get word from memory
-                DWA(DEEK)
-                .DB     "RAM"           ;RAM - no par., get RAM size
+                .DB     "USR"           ;fkt USR(PARA) call usr fkt at TOP
+                DWA(USR)                ; and return a result in HL
+                .DB     "SIZE"          ;const SIZE - no parantesis, get free mem
+                DWA(SIZE)
+                .DB     "RAM"           ;const RAM - no par., get TEXT begin
                 DWA(RAM)
+                .DB     "TOP"           ;const TOP - no par., get TEXT TOP
+                DWA(TOP)
                 DWA(XP40)               ;END OF LIST
 ;
 TAB5:           ;"TO" IN "FOR"
@@ -1768,12 +1788,13 @@ LSTROM:                                 ;ALL ABOVE CAN BE ROM
 ;
 TXTBGN:
 ;
-                .ORG            RAMBGN+RAMSZE-$100
+                .ORG            RAMBGN+RAMSZE-$200
 ;
 TXTEND:         .EQU            $               ;TEXT SAVE AREA ENDS
-ARRBGN:         .DS             2               ;VARIABLEs '@(0)', '@(1), @(2)
+                                                ;VARIABLEs '@(0)', '@(1), @(2)
                                                 ;... stored top-down
-                                                ;i.e. &@(i) = TXTEND-2*i
+                                                ;i.e. &@(i) = TXTEND-2-2*i
+USRSPC:         .DS             128
 ;
 VARBGN:         .DS             2*26            ;VARIABLES 'A'..'Z'
 OCSW:           .DS             1               ;SWITCH FOR OUTPUT
@@ -1789,7 +1810,7 @@ LOPLMT:         .DS             2               ;LIMIT
 LOPLN:          .DS             2               ;LINE NUMBER
 LOPPT:          .DS             2               ;TEXT POINTER
 RANPNT:         .DS             2               ;RANDOM NUMBER POINTER
-BUFFER:         .DS             64              ;INPUT BUFFER
+BUFFER:         .DS             80              ;INPUT BUFFER
 BUFEND:         .DS             1               ;BUFFER ENDS
 STKLMT:         .DS             1               ;TOP LIMIT FOR STACK
 ;
