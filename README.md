@@ -870,54 +870,49 @@ And run it. Show the IO space with `i 0 10`:
 - Address 1: 00=NEC, 28=Zilog (and compatible)
 - Address 2: 80=Z80, 88=U880
 
-## Nascom ROM Basic
-
-My 1st computer back in 1980 was a [Nascom 2 kit](https://en.wikipedia.org/wiki/Nascom) with
-16K dynamic RAM and 8K Basic in ROM, so I wanted to include the Basic interpreter from the
-[Z80 retroshield project](https://github.com/skx/z80retroshield/tree/master/examples/basic).
-
-```
-Z80 SBC By Grant Searle
-
-Memory top?
-Z80 BASIC Ver 4.7b
-Copyright (C) 1978 by Microsoft
-6270 Bytes free
-Ok
-```
-
-The SW is based on the Nascom Rom Basic:
-
-```
-; NASCOM ROM BASIC Ver 4.7, (C) 1978 Microsoft
-; Scanned from source published in 80-BUS NEWS from Vol 2, Issue 3
-; (May-June 1983) to Vol 3, Issue 3 (May-June 1984)
-```
-
-and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
-The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
-
-It can be started with the command `B`.
-
 ## Palo Alto Tiny BASIC ##
 
-One of the first *Open Source* projects, written by [Li-Chen Wang](https://en.wikipedia.org/wiki/Li-Chen_Wang)
-who coined the term *"Copyleft"* to describe his concept. Tiny BASIC was created as a reaction to Bill Gates'
+```
+;*************************************************************
+;
+;                 TINY BASIC FOR INTEL 8080
+;                       VERSION 2.0
+;                     BY LI-CHEN WANG
+;                  MODIFIED AND TRANSLATED
+;                    TO INTEL MNEMONICS
+;                     BY ROGER RAUSKOLB
+;                      10 OCTOBER,1976
+;                        @COPYLEFT
+;                   ALL WRONGS RESERVED
+;
+;*************************************************************
+```
+
+This was one of the first *Open Source* projects for a broader audience, written 1976 by
+[Li-Chen Wang](https://en.wikipedia.org/wiki/Li-Chen_Wang) who coined the term *"Copyleft"*
+to describe his concept. *Tiny BASIC* was created as a reaction to Bill Gates'
 [An Open Letter to Hobbyists](https://en.wikipedia.org/wiki/An_Open_Letter_to_Hobbyists)
-in which Gates emphasised his view that hobbyists who copied his *Altair BASIC* interpreter software
-were stealing from him personally.
+in which Gates emphasised his view that hobbyists who copied his *Altair BASIC*
+interpreter software were stealing from him personally.
 
 *Tiny BASIC* uses 16bit signed integer arithmetic with the operators `+`, `-`, `*`, `/`
-and nested parantheses, provides 26 variables `A` to `Z` and one array `@` that occupies
-the remaining free RAM space. The opiginal BASIC only had the functions `ABS(n)` and `RND(n)`,
-I added some HW-oriented functionality, like `GET(addr)`, `PUT addr,val,val,...`
-as well as hex constants written as `$xxxx` and the possibility to print in different
-number bases n=2..16 as unsigned int using the format specifier `%n`, e.g.
+and nested parantheses, has 26 staticly assigned variables `A` to `Z` and one dynamic
+array `@` that occupies the remaining free RAM space. The opiginal BASIC only provided the commands
+`NEW`, `LIST`, `RUN`, `LET`, `IF`, `GOTO`, `GOSUB`, `RETURN`, `FOR`, `TO`, `STEP`, `NEXT`,
+`INPUT`, `PRINT`, `STOP`, the constant `SIZE` (returning the RAM size not occupied by code),
+and the functions `ABS(n)` and `RND(n)`.
+
+Originally written in 8080 syntax I converted it to the nicer Z80 syntax using the
+[8080 z80](https://hc-ddr.hucki.net/wiki/doku.php/cpm/8080_z80) tool and assembled it with the
+[uz80as](https://github.com/jorgicor/uz80as) assembler (that besides Z80 supports a lot of other processors).
+I also added some HW-oriented functionality like `GET(addr)`, `PUT addr,val,val,...`
+as well as hex constants that are written as `$xxxx` and the possibility to print values as `uint16_t`
+in different number bases n=2..16 using the format specifier `%n`, e.g.
 `PRINT %16,expression,...` prints in unsigned hex up to the end of this `PRINT` statement.
 The BASIC statement `HALT` executes the Z80 opcode `HALT` with which the Arduino exits
 the execution loop and returns to the command input.
 
-The Tiny BASIC interpreter uses 2K ROM and 6.5K RAM and can be started with the command `BT`:
+The Tiny BASIC interpreter with my additions still uses 2K ROM and 6.5K RAM and can be started with the command `BT`:
 
 ```
 TinyBASIC
@@ -940,6 +935,20 @@ This little code line uses my HW extensions to hex-dump the content of the progr
 OK
 ```
 
+Each line starts with the line number stored as int16_t followed by the unchanged ASCII text finished with CR.
+To save space commands can be abbreviated with a full stop:
+
+```
+>10 f.a=ram to top-s.-1;p.#4,%16,g.(a),;n.a
+>run
+   $A  $0 $66 $2E $61 $3D $72 $61 $6D $20 $74 $6F $20 $74 $6F $70
+  $2D $73 $2E $2D $31 $3B $70 $2E $23 $34 $2C $25 $31 $36 $2C $67
+  $2E $28 $61 $29 $2C $3B $6E $2E $61  $D
+OK
+```
+
+Depending on the context `g.` could either be the command `goto` or the function `get`.
+
 This part puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it via the funtion `USR(123)`.
 
 ```
@@ -951,3 +960,34 @@ OK
 
 OK
 ```
+
+## Nascom ROM Basic
+
+```
+;*************************************************************
+;
+; NASCOM ROM BASIC Ver 4.7, (C) 1978 Microsoft
+; Scanned from source published in 80-BUS NEWS from Vol 2, Issue 3
+; (May-June 1983) to Vol 3, Issue 3 (May-June 1984)
+;
+;*************************************************************
+```
+
+My 1st computer back in 1980 was a [Nascom 2 kit](https://en.wikipedia.org/wiki/Nascom) with
+16K dynamic RAM and 8K Basic in ROM, so I wanted to include the Basic interpreter from the
+[Z80 retroshield project](https://github.com/skx/z80retroshield/tree/master/examples/basic).
+
+```
+Z80 SBC By Grant Searle
+
+Memory top?
+Z80 BASIC Ver 4.7b
+Copyright (C) 1978 by Microsoft
+6270 Bytes free
+Ok
+```
+
+This Basic is based on the Nascom Rom Basic and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
+The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
+
+It can be started with the command `B`.
