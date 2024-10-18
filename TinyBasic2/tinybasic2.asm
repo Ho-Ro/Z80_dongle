@@ -88,33 +88,33 @@ DEL             .EQU            7FH             ; DELETE
 
 .ORG            ROMBGN
 
-;RSTART          .EQU    $
-START:          LD      SP,STACK        ;*** COLD START ***
-                LD      A,0FFH
-                JP      INIT
 
-RTSTC           .EQU    $       ;*** RST 1 @ $0008 ***
-TSTC:           EX      (SP),HL
+CSTART:         LD      SP,STACK        ;*** COLD START ***
+                LD      A,$C9           ;"RET", also not an ASCII char
+                JP      INIT            ;as delimiter for PRTSTG
+
+                ;*** RST 1 @ $0008 ***
+RTSTC:          EX      (SP),HL
                 RST     RIGNBLK ;IGNORE BLANKS AND
                 CP      (HL)    ;TEST CHARACTER
                 JP      TC1     ;REST OF THIS IS AT TC1
 
 CRLF:           LD      A,CR    ;*** CRLF ***
 ;
-ROUTC           .EQU    $       ;*** RST 2 @ $0010 ***
-OUTC:           OUT     (IODATA),A      ;Out to data port
+                ;*** RST 2 @ $0010 ***
+ROUTC:          OUT     (IODATA),A      ;Out to data port
                 CP      CR      ;WAS IT CR?
                 RET     NZ      ;NO, FINISHED
                 JP      OC1     ;REST OF THIS IS AT OC1
 
-REXPR           .EQU    $       ;*** RST 3 @ $0018 ***
-EXPR:           CALL    EXPR2
+                ;*** RST 3 @ $0018 ***
+REXPR:          CALL    EXPR2
                 PUSH    HL      ;EVALUATE AN EXPRESSION
                 JP      EXPR1   ;REST OF IT AT EXPR1
 .DB             "W"
 
-RCOMP           .EQU    $       ;*** RST 4 @ $0020 ***
-COMP:           LD      A,H
+                ;*** RST 4 @ $0020 ***
+RCOMP:          LD      A,H
                 CP      D       ;COMPARE HL WITH DE
                 RET     NZ      ;RETURN CORRECT C AND
                 LD      A,L     ;Z FLAGS
@@ -122,21 +122,21 @@ COMP:           LD      A,H
                 RET
 .DB             "AN"
 
-RIGNBLK         .EQU    $       ;*** RST 5 @ $0028 ***
-IGNBLK:         LD      A,(DE)
+                ;*** RST 5 @ $0028 ***
+RIGNBLK:        LD      A,(DE)
                 CP      20H     ;IGNORE BLANKS
                 RET     NZ      ;IN TEXT (WHERE DE->)
                 INC     DE      ;AND RETURN THE FIRST
-                JP      IGNBLK  ;NON-BLANK CHAR. IN A
+                JP      RIGNBLK  ;NON-BLANK CHAR. IN A
 
-RFINISH         .EQU    $       ;*** RST 6 @ $0030 ***
-FINISH:         POP     AF
+                ;*** RST 6 @ $0030 ***
+RFINISH:        POP     AF
                 CALL    FIN     ;CHECK END OF COMMAND
                 JP      QWHAT   ;PRINT "WHAT?" IF WRONG
 .DB             "G"
 
-RTSTV           .EQU    $       ;*** RST 7 @ $0038 ***
-TSTV:           RST     RIGNBLK ;IGNBLK
+                ;*** RST 7 @ $0038 ***
+RTSTV:          RST     RIGNBLK ;IGNBLK
                 SUB     '@'     ;TEST VARIABLES
                 RET     C       ;C: < '@', NOT A VARIABLE
                 JP      NZ,TV1  ;NZ: NOT THE '@' ARRAY
@@ -202,7 +202,7 @@ TN1:            CP      '0'     ;IF NOT, RETURN 0 IN
                 RET     NC      ;TO BINARY IN HL AND
                 LD      A,0F0H  ;SET B TO # OF DIGITS
                 AND     H       ;IF H>15, THERE IS NO
-                JP      NZ,QHOW ;ROOM FOR NEXT DIGIT
+                JR      NZ,QHOW ;ROOM FOR NEXT DIGIT
                 INC     B       ;B COUNTS # OF DIGITS
                 PUSH    BC
                 LD      B,H     ;HL=10*HL+(NEW DIGIT)
@@ -222,7 +222,8 @@ TN1:            CP      '0'     ;IF NOT, RETURN 0 IN
                 POP     BC
                 LD      A,(DE)  ;DO THIS DIGIT AFTER
                 JP      P,TN1   ;DIGIT. S SAYS OVERFLOW
-
+;
+                                ;OUTPUT HEX NUMBER
 TX1:            INC     DE      ;SKIP TO NEXT HEX
                 LD      A,(DE)  ;GET HEX DIGIT
                 CP      '0'     ;< '0'
@@ -242,7 +243,7 @@ TX2:            AND     0FH     ;GET HEX CODE 0..F
                 AND     H       ;THERE IS NO ROOM
                 LD      A,B
                 POP     BC
-                JP      NZ,QHOW ;FOR NEXT DIGIT
+                JR      NZ,QHOW ;FOR NEXT DIGIT
 
                 INC     B       ;B COUNTS # OF DIGITS
                 ADD     HL,HL   ;2*HL
@@ -251,27 +252,75 @@ TX2:            AND     0FH     ;GET HEX CODE 0..F
                 ADD     HL,HL   ;16*HL
                 OR      L       ;PUT HEX CODE INTO
                 LD      L,A     ;THE 4 LSB OF HL
-                ;MOV  A,H
-                ;ORA  A
                 JR      TX1     ;DIGIT AFTER DIGIT
 
 QHOW:           PUSH    DE      ;*** ERROR "HOW?" ***
 AHOW:           LD      DE,HOW
                 JP      ERROR
 
-HOW:            .DB             "HOW?"
-.DB             CR
+TIBAS:          .DB     "TinyBASIC"
+                .DB     CR
 
-OK:             .DB             "OK"
-.DB             CR
+HOW:            .DB     "HOW?"
+                .DB     CR
 
-WHAT:           .DB             "WHAT?"
-.DB             CR
+OK:             .DB     "OK"
+                .DB     CR
 
-SORRY:          .DB             "SORRY"
-.DB             CR
+WHAT:           .DB     "WHAT?"
+                .DB     CR
 
+SORRY:          .DB     "SORRY"
+                .DB     CR
+
+;
 ;*************************************************************
+;
+; *** ROUTC *** CHKIO ***
+;
+; THESE ARE THE ONLY I/O ROUTINES IN TBI.
+; OUTC WILL OUTPUT THE BYTE IN A.
+; IF THAT IS A CR, A LF IS ALSO SEND OUT.
+; ONLY THE FLAGS MAY BE CHANGED AT RETURN.
+; ALL REGISTERS ARE RESTORED.
+;
+; 'CHKIO' CHECKS THE INPUT.
+; IF NO INPUT, IT WILL RETURN TO THE CALLER WITH THE Z FLAG SET.
+; IF THERE IS INPUT, Z FLAG IS CLEARED AND THE INPUT BYTE IS IN A.
+; IF A CONTROL-C IS READ, 'CHKIO' WILL RESTART TBI
+; AND DO NOT RETURN TO THE CALLER.
+;
+
+;THIS IS AT LOC. 10
+;ROUTC:         OUT     (IODATA),A      ;Out to data port
+;               CP      CR      ;WAS IT CR?
+;               RET     NZ      ;NO, FINISHED
+;               JP      OC1     ;REST OF THIS IS AT OC1
+;
+OC1:            LD      A,LF    ;YES, WE SEND LF TOO
+                RST     ROUTC   ;THIS IS RECURSIVE
+                LD      A,CR    ;GET CR BACK IN A
+                RET
+
+CHKIO:          IN      A,(IOSTAT)      ;*** CHKIO ***
+                AND     IO_RX_BIT       ;MASK STATUS BIT
+                RET     Z       ;NOT READY, RETURN "Z"
+                IN      A,(IODATA)      ;READY, READ DATA
+                AND     7FH     ;MASK BIT 7 OFF
+CI0:            CP      03H     ;IS IT CONTROL-C?
+                RET     NZ      ;NO, RETURN "NZ"
+                JR      WSTART  ;YES, RESTART TBI
+
+;
+;*************************************************************
+;
+
+;
+;*************************************************************
+;
+; *** INIT ***
+;
+; PUT IO INITIALISATION HERE, E.G. FOR THE SERIAL INTERFACE
 ;
 ; *** MAIN ***
 ;
@@ -303,72 +352,84 @@ SORRY:          .DB             "SORRY"
 ; THIS LOOP OR WHILE WE ARE INTERPRETING A DIRECT COMMAND
 ; (SEE NEXT SECTION). "CURRNT" SHOULD POINT TO A 0.
 ;
-INIT1:          LD      A,$C9   ;PUT RET OPCODE
-                LD      (USRSPC),A ; AT USR CODE SPACE
-WSTART:         LD      SP,STACK
-ST1:            CALL    CRLF    ;AND JUMP TO HERE
-                LD      DE,OK   ;DE->STRING
-                SUB     A       ;A=0
-                CALL    PRTSTG  ;PRINT STRING UNTIL CR
-                LD      HL,ST2+1        ;LITERAL 0
-                LD      (CURRNT),HL     ;CURRENT->LINE # = 0
-ST2:            LD      HL,0
+;
+;THIS IS AT LOC. 0
+;CSTART:        LD      SP,STACK    ;*** COLD START ***
+;               LD      A,$C9       ;"RET", also != ASCII char
+;               JP      INIT        ;for PRTSTG
+;
+INIT:           LD      (USRSPC),A  ;"RET" AT USR CODE SPACE
+                LD      DE,TIBAS    ;COLD START MESSAGE
+                CALL    PRTSTG
+                LD      HL,CSTART   ;INIT RANDOM POINTER
+                LD      (RANPNT),HL
+                LD      HL,TXTBGN   ;UNFILLED TEXT
+                LD      (TXTUNF),HL
+;
+WSTART:         LD      SP,STACK    ;*** WARM START ***
+                CALL    CRLF        ;AND JUMP TO HERE
+                LD      DE,OK       ;DE->STRING
+                SUB     A           ;A=0
+                CALL    PRTSTG      ;PRINT STRING UNTIL CR
+                LD      HL,ST2+1    ;HACK ST2+1 -> 0000
+                LD      (CURRNT),HL ;CURRENT->LINE # = 0
+ST2:            LD      HL,0000     ;
                 LD      (LOPVAR),HL
                 LD      (STKGOS),HL
-ST3:            LD      A,'>'   ;PROMPT '>' AND
-                CALL    GETLN   ;READ A LINE
-                PUSH    DE      ;DE->END OF LINE
-                LD      DE,BUFFER       ;DE->BEGINNING OF LINE
-                CALL    TSTNUM  ;TEST IF IT IS A NUMBER
+ST3:            LD      A,'>'       ;PROMPT '>' AND
+                CALL    GETLN       ;READ A LINE
+                PUSH    DE          ;DE->END OF LINE
+                LD      DE,BUFFER   ;DE->BEGINNING OF LINE
+                CALL    TSTNUM      ;TEST IF IT IS A NUMBER
                 RST     RIGNBLK
-                LD      A,H     ;HL=VALUE OF THE # OR
-                OR      L       ;0 IF NO # WAS FOUND
-                POP     BC      ;BC->END OF LINE
+                LD      A,H         ;HL=VALUE OF THE # OR
+                OR      L           ;0 IF NO # WAS FOUND
+                POP     BC          ;BC->END OF LINE
                 JP      Z,DIRECT
-                DEC     DE      ;BACKUP DE AND SAVE
-                LD      A,H     ;VALUE OF LINE # THERE
+                DEC     DE          ;BACKUP DE AND SAVE
+                LD      A,H         ;VALUE OF LINE # THERE
                 LD      (DE),A
                 DEC     DE
                 LD      A,L
                 LD      (DE),A
-                PUSH    BC      ;BC,DE->BEGIN, END
+                PUSH    BC          ;BC,DE->BEGIN, END
                 PUSH    DE
                 LD      A,C
                 SUB     E
-                PUSH    AF      ;A=# OF BYTES IN LINE
-                CALL    FNDLN   ;FIND THIS LINE IN SAVE
-                PUSH    DE      ;AREA, DE->SAVE AREA
-                JR      NZ,ST4  ;NZ:NOT FOUND, INSERT
-                PUSH    DE      ;Z:FOUND, DELETE IT
-                CALL    FNDNXT  ;FIND NEXT LINE
-                                ;DE->NEXT LINE
-                POP     BC      ;BC->LINE TO BE DELETED
-                LD      HL,(TXTUNF)     ;HL->UNFILLED SAVE AREA
-                CALL    MVUP    ;MOVE UP TO DELETE
-                LD      H,B     ;TXTUNF->UNFILLED AREA
+                PUSH    AF          ;A=# OF BYTES IN LINE
+                CALL    FNDLN       ;FIND THIS LINE IN SAVE
+                PUSH    DE          ;AREA, DE->SAVE AREA
+                JR      NZ,ST4      ;NZ:NOT FOUND, INSERT
+                PUSH    DE          ;Z:FOUND, DELETE IT
+                CALL    FNDNXT      ;FIND NEXT LINE
+                                    ;DE->NEXT LINE
+                POP     BC          ;BC->LINE TO BE DELETED
+                LD      HL,(TXTUNF) ;HL->UNFILLED SAVE AREA
+                CALL    MVUP        ;MOVE UP TO DELETE
+                LD      H,B         ;TXTUNF->UNFILLED AREA
                 LD      L,C
-                LD      (TXTUNF),HL     ;UPDATE
-ST4:            POP     BC      ;GET READY TO INSERT
-                LD      HL,(TXTUNF)     ;BUT FIRST CHECK IF
-                POP     AF      ;THE LENGTH OF NEW LINE
-                PUSH    HL      ;IS 3 (LINE # AND CR)
-                CP      3       ;THEN DO NOT INSERT
-                JP      Z,WSTART ;MUST CLEAR THE STACK
-                ADD     A,L     ;COMPUTE NEW TXTUNF
+                LD      (TXTUNF),HL ;UPDATE
+ST4:            POP     BC          ;GET READY TO INSERT
+                LD      HL,(TXTUNF) ;BUT FIRST CHECK IF
+                POP     AF          ;THE LENGTH OF NEW LINE
+                PUSH    HL          ;IS 3 (LINE # AND CR)
+                CP      3           ;THEN DO NOT INSERT
+                JR      Z,WSTART    ;MUST CLEAR THE STACK
+                ADD     A,L         ;COMPUTE NEW TXTUNF
                 LD      L,A
                 LD      A,0
                 ADC     A,H
-                LD      H,A     ;HL->NEW UNFILLED AREA
-                LD      DE,TXTEND       ;CHECK TO SEE IF THERE
-                RST     RCOMP   ;COMP HL,DE - IS ENOUGH SPACE
-                JP      NC,QSORRY       ;SORRY, NO ROOM FOR IT
-                LD      (TXTUNF),HL     ;OK, UPDATE TXTUNF
-                POP     DE      ;DE->OLD UNFILLED AREA
+                LD      H,A         ;HL->NEW UNFILLED AREA
+                LD      DE,TXTEND   ;CHECK TO SEE IF THERE
+                RST     RCOMP       ;COMP HL,DE - IS ENOUGH SPACE
+                JP      NC,QSORRY   ;SORRY, NO ROOM FOR IT
+                LD      (TXTUNF),HL ;OK, UPDATE TXTUNF
+                POP     DE          ;DE->OLD UNFILLED AREA
                 CALL    MVDOWN
-                POP     DE      ;DE->BEGIN, HL->END
+                POP     DE          ;DE->BEGIN, HL->END
                 POP     HL
-                CALL    MVUP    ;MOVE NEW LINE TO SAVE
-                JR      ST3     ;AREA
+                CALL    MVUP        ;MOVE NEW LINE TO SAVE
+                JR      ST3         ;AREA
 
 ;*************************************************************
 ;
@@ -435,7 +496,7 @@ GOTO:           RST     REXPR   ;*** GOTO EXPR ***
                 CALL    FNDLN   ;FIND THE TARGET LINE
                 JP      NZ,AHOW ;NO SUCH LINE #
                 POP     AF      ;CLEAR THE PUSH DE
-                JP      RUNTSL  ;GO DO IT
+                JR      RUNTSL  ;GO DO IT
 ;
 ;*************************************************************
 ;
@@ -502,7 +563,7 @@ PR5:            TSTCH('%',PR1)  ;ELSE IS IT PRTNUM BASE?
                 LD      (PNBASE),A      ;IN PNBASE
                 JR      PR3     ;LOOK FOR MORE TO PRINT
 PR1:            CALL    QTSTG   ;OR IS IT A STRING?
-                JR      PR8     ;IF NOT, MUST BE EXPR.
+                JP      PR8     ;HACK JP!! IF NOT, MUST BE EXPR.
 PR3:            TSTCH($2C,PR6)  ;IF ",", GO FIND NEXT
                 CALL    FIN     ;IN THE LIST.
                 JR      PR0     ;LIST CONTINUES
@@ -549,6 +610,7 @@ GOSUB:          CALL    PUSHA   ;SAVE THE CURRENT "FOR"
                 ADD     HL,SP
                 LD      (STKGOS),HL
                 JP      RUNTSL  ;THEN RUN THAT LINE
+;
 RETURN:         CALL    ENDCHK  ;THERE MUST BE A CR
                 LD      HL,(STKGOS)     ;OLD STACK POINTER
                 LD      A,H     ;0 MEANS NOT EXIST
@@ -618,7 +680,7 @@ FR5:            LD      HL,(CURRNT)     ;SAVE CURRENT LINE #
                 LD      H,B
                 LD      L,B             ;HL=0 NOW
                 ADD     HL,SP           ;HERE IS THE STACK
-                .DB     3EH             ;SKIP "ADD HL,BC"
+                .DB     3EH             ;HACK SKIP "ADD HL,BC"
 FR7:            ADD     HL,BC           ;EACH LEVEL IS 10 DEEP
                 LD      A,(HL)          ;GET THAT OLD 'LOPVAR'
                 INC     HL
@@ -751,7 +813,7 @@ INPERR:         LD      HL,(STKINP)     ;*** INPERR ***
 INPUT:          ;*** INPUT ***
 IP1:            PUSH    DE      ;SAVE IN CASE OF ERROR
                 CALL    QTSTG   ;IS NEXT ITEM A STRING?
-                JR      IP2     ;NO
+                JP      IP2     ;HACK JP!! NO
                 RST     RTSTV   ;YES, BUT FOLLOWED BY A
                 JR      C,IP4   ;VARIABLE?   NO.
                 JR      IP3     ;YES.  INPUT VARIABLE
@@ -781,9 +843,9 @@ IP3:            PUSH    DE      ;SAVE TEXT POINTER
                 CALL    GETLN   ;AND GET A LINE
                 LD      DE,BUFFER       ;POINTS TO BUFFER
                 RST     REXPR   ;EVALUATE INPUT
-;NOP                             ;CAN BE 'CALL ENDCHK'
-;NOP
-;NOP
+                ;NOP            ;??? CAN BE 'CALL ENDCHK'
+                ;NOP
+                ;NOP
                 POP     DE      ;OK, GET OLD HL
                 EX      DE,HL
                 LD      (HL),E  ;SAVE VALUE IN VAR.
@@ -836,7 +898,7 @@ XP11:           CALL    XP18    ;REL.OP.">="
                 LD      L,A     ;YES, RETURN HL=1
                 RET
 ;
-XP12:           CALL    XP18    ;REL.OP."#"
+XP12:           CALL    XP18    ;REL.OP."#" OR "!="
                 RET     Z       ;FALSE, RETURN HL=0
                 LD      L,A     ;TRUE, RETURN HL=1
                 RET
@@ -854,7 +916,7 @@ XP14:           CALL    XP18    ;REL.OP."<="
                 LD      L,H     ;ELSE SET HL=0
                 RET
 ;
-XP15:           CALL    XP18    ;REL.OP."="
+XP15:           CALL    XP18    ;REL.OP."=" OR "=="
                 RET     NZ      ;FALSE, RETURN HL=0
                 LD      L,A     ;ELSE SET HL=1
                 RET
@@ -997,10 +1059,13 @@ RND:            CALL    PARN    ;*** RND(EXPR) ***
                 LD      DE,LSTROM       ;NUMBER
                 RST     RCOMP
                 JR      C,RA1   ;WRAP AROUND IF LAST
-                LD      HL,START
-RA1:            LD      E,(HL)
+                LD      HL,CSTART
+RA1:            LD      A,R     ;RFSH REG GIVES TIME DEP. RANDOM
+                XOR     (HL)
+                LD      E,A
                 INC     HL
-                LD      D,(HL)
+                XOR     (HL)
+                LD      D,A
                 LD      (RANPNT),HL
                 POP     HL
                 EX      DE,HL
@@ -1036,19 +1101,13 @@ USR:            CALL    PARN    ;*** USR(PARA) ***
 ;               ...             ;    - Do the work
 ;               ...             ;    - Put result in HL
 ;               RET             ;$C9 - RET to BASIC
-
+;                               ;DEFAULT: (USRSPC)=$C9
 
 RAM:            LD      HL,TXTBGN ; *** RAM *** START OF TEXT AREA
                 RET
 
-
 TOP:            LD      HL,TXTEND ; *** TOP *** END OF TEXT AREA
                 RET
-
-
-UNF:            LD      HL,(TXTUNF) ; *** UNF *** START OF UNFILLED TEXT AREA
-                RET
-
 
 PUT:            RST     REXPR   ;*** PUT ADDR, VAL1 [,VAL2, VAL3,..]
                 TSTCH($2C,PT2)  ; 1ST ',' SEPARATES THE VALUE(S)
@@ -1066,10 +1125,8 @@ PT1:            RST     RFINISH ;READY
 ;
 PT2:            JP      QWHAT   ;ELSE SAY: "WHAT?"
 
-
-
-
 HALT:           HALT            ;HALT CPU (return to analyser)
+
 ;
 ;*************************************************************
 ;
@@ -1102,15 +1159,11 @@ DV2:            INC     C       ;DUMB ROUTINE
                 JR      NC,DV2  ;AND COUNT
                 ADD     HL,DE
                 RET
-;
-SUBDE:          LD      A,L     ;*** SUBDE ***
-                SUB     E       ;SUBSTRACT DE FROM
-                LD      L,A     ;HL
-                LD      A,H
-                SBC     A,D
-                LD      H,A
+
+SUBDE:          OR      A       ;CLR CY
+                SBC     HL,DE
                 RET
-;
+
 CHKSGN:         LD      A,H     ;*** CHKSGN ***
                 OR      A       ;CHECK SIGN OF HL
                 RET     P       ;IF HL >=0 RETURN
@@ -1174,9 +1227,9 @@ CK1:            RST     RCOMP
 ; 'AHOW' AND 'AHOW' IN THE ZERO PAGE SECTION ALSO DO THIS.
 ;
 SETVAL:         RST     RTSTV   ;*** SETVAL ***
-                JP      C,QWHAT ;"WHAT?" NO VARIABLE
+                JR      C,QWHAT ;"WHAT?" NO VARIABLE
                 PUSH    HL      ;SAVE ADDRESS OF VAR.
-                TSTCH('=',SV1)  ;PASS "=" SIGN
+                TSTCH('=',QWHAT)  ;PASS "=" SIGN
                 RST     REXPR   ;EVALUATE EXPR.
                 LD      B,H     ;VALUE IS IN BC NOW
                 LD      C,L
@@ -1185,7 +1238,6 @@ SETVAL:         RST     RTSTV   ;*** SETVAL ***
                 INC     HL
                 LD      (HL),B
                 RET
-SV1:            JP      QWHAT   ;NO "=" SIGN
 
 FIN:            TSTCH(';',FI1)  ;*** FIN ***
                 POP     AF      ;";", PURGE RET. ADDR.
@@ -1230,7 +1282,8 @@ ERROR:          SUB     A       ;*** ERROR ***
 ;
 QSORRY:         PUSH    DE      ;*** QSORRY ***
 ASORRY:         LD      DE,SORRY        ;*** ASORRY ***
-                JP      ERROR
+                JR      ERROR
+
 ;
 ;*************************************************************
 ;
@@ -1342,8 +1395,8 @@ FNDSKP:         LD      A,(DE)  ;*** FNDSKP ***
 ; QUOTE.  IF NONE OF THESE, RETURN TO CALLER.  IF BACK-ARROW,
 ; OUTPUT A CR WITHOUT A LF.  IF SINGLE OR DOUBLE QUOTE, PRINT
 ; THE STRING IN THE QUOTE AND DEMANDS A MATCHING UNQUOTE.
-; AFTER THE PRINTING THE NEXT 3 BYTES OF THE CALLER IS SKIPPED
-; OVER (USUALLY A JUMP INSTRUCTION.
+; HACK AFTER THE PRINTING THE NEXT 3 BYTES OF THE CALLER
+;      IS SKIPPED OVER (SHALL BE A "JP" INSTRUCTION).
 ;
 ; 'PRTNUM' PRINTS THE NUMBER IN HL.  LEADING BLANKS ARE ADDED
 ; IF NEEDED TO PAD THE NUMBER OF SPACES TO THE NUMBER IN C.
@@ -1367,25 +1420,28 @@ QTSTG:          TSTCH($22,QT3)  ;*** QTSTG ***
                 LD      A,22H   ;IT IS A '"'
 QT1:            CALL    PRTSTG  ;PRINT UNTIL ANOTHER
 QT1A:           CP      CR      ;WAS LAST ONE A CR?
-                POP     HL      ;RETURN ADDRESS
-                JP      Z,RUNNXL        ;WAS CR, RUN NEXT LINE
-QT2:            INC     HL      ;SKIP 3 BYTES ON RETURN
-                INC     HL
-                INC     HL
-                JP      (HL)    ;RETURN
+                POP     HL       ; HACK RETURN ADDRESS
+                JP      Z,RUNNXL ; WAS CR, RUN NEXT LINE
+QT2:            INC     HL       ; !! SKIP 3 BYTES ON RETURN
+                INC     HL       ; !! -> AFTER "CALL QTSTG"
+                INC     HL       ; !!    MUST BE "JP .."
+                JP      (HL)     ; !! RETURN AFTER THIS "JP"
+;
 QT3:            TSTCH($27,QT4)  ;IS IT A "'"?
                 LD      A,27H   ;YES, DO THE SAME
                 JR      QT1     ;AS IN '"'
+;
 QT4:            TSTCH($5F,QT5)  ;IS IT UNDERLINE?
                 LD      A,08DH  ;YES, CR WITHOUT LF
                 RST     ROUTC
-                POP     HL      ;RETURN ADDRESS
+                POP     HL      ;HACK RETURN ADDRESS
                 JR      QT2
-QT5:            TSTCH(5EH,QT5)  ;RST 1, is it '^'?
-                LD      A,(DE)
-                XOR     40H
-                CALL    OUTC
-                LD      A,(DE)
+;
+QT5:            TSTCH(5EH,QT6)  ;RST 1, is it '^'?
+                LD      A,(DE)  ;CHR
+                XOR     40H     ;CONVERT TO CTRL
+                RST     ROUTC
+                LD      A,(DE)  ;RESTORE CHR
                 INC     DE
                 JR      QT1A
 QT6:            RET             ;NONE OF ABOVE
@@ -1395,10 +1451,10 @@ PRTNUM:                         ;*** PRINT NUMBER IN HL ***
                 OR      A
                 JR      Z,PN0   ;0: DEFAULT DEC
                 CP      16      ;HEX NUMBER?
-                JP      NZ,PN1  ;NO
+                JR      NZ,PN1  ;NO
                 LD      B,'$'   ;PRINT LEADING '$'
                 DEC     C       ;'$' TAKES SPACE
-                JP      PN1     ;HEX IS UNSIGNED
+                JR      PN1     ;HEX IS UNSIGNED
 PN0:            LD      B,0     ;NO PREFIX YET
                 CALL    CHKSGN  ;CHECK SIGN
                 JP      P,PN1   ;NO SIGN
@@ -1418,13 +1474,13 @@ PN1A:           LD      E,A
 PN2:            CALL    DIVIDE  ;DIVIDE HL BY NUMBER BASE
                 LD      A,B     ;RESULT 0?
                 OR      C
-                JP      Z,PN3   ;YES, WE GOT ALL
+                JR      Z,PN3   ;YES, WE GOT ALL
                 EX      (SP),HL ;NO, SAVE REMAINDER
                 DEC     L       ;AND COUNT SPACE
                 PUSH    HL      ;HL IS OLD BC
                 LD      H,B     ;MOVE RESULT TO BC
                 LD      L,C
-                JP      PN2     ;AND DIVIDE AGAIN
+                JR      PN2     ;AND DIVIDE AGAIN
 ;
 PN3:            POP     BC      ;WE GOT ALL DIGITS IN
 PN4:            DEC     C       ;THE STACK
@@ -1433,10 +1489,10 @@ PN4:            DEC     C       ;THE STACK
                 JP      M,PN5   ;NO LEADING BLANKS
                 LD      A,' '   ;LEADING BLANKS
                 RST     ROUTC
-                JP      PN4     ;MORE?
+                JR      PN4     ;MORE?
 PN5:            LD      A,B     ;PRINT SIGN OR '$'
                 OR      A
-                CALL    NZ,OUTC
+                CALL    NZ,ROUTC
                 LD      E,L     ;LAST REMAINDER IN E
 PN6:            LD      A,(PNBASE)      ;GET NUMBER BASE
                 OR      A       ;DEFAULT DECIMAL?
@@ -1447,13 +1503,13 @@ PN6A:           CP      E       ;IT IS FLAG FOR NO MORE
                 POP     DE
                 RET     Z       ;IF SO, RETURN
                 CP      10      ;0-9? < A hex?
-                JP      C,PN7   ;Skip Add 7
+                JR      C,PN7   ;Skip Add 7
                 ADD     A,'A'-'0'-10    ;Bring it up to ASCII A-F
 PN7:            ADD     A,'0'   ;ELSE CONVERT TO ASCII
                 RST     ROUTC   ;AND PRINT THE DIGIT
-                JP      PN6     ;GO BACK FOR MORE
+                JR      PN6     ;GO BACK FOR MORE
 
-PRTLN:          XOR     A       ;SET 10 AS DEFAULT BASE
+PRTLN:          XOR     A       ;0 -> DEFAULT BASE 10 SIGNED
                 LD      (PNBASE),A      ;FOR PRTNUM
                 LD      A,(DE)
                 LD      L,A     ;LOW ORDER LINE #
@@ -1510,7 +1566,7 @@ POPA:           POP     BC      ;BC = RETURN ADDR.
                 LD      (LOPVAR),HL     ;=0 MEANS NO MORE
                 LD      A,H
                 OR      L
-                JP      Z,PP1   ;YEP, GO RETURN
+                JR      Z,PP1   ;YEP, GO RETURN
                 POP     HL      ;NOP, RESTORE OTHERS
                 LD      (LOPINC),HL
                 POP     HL
@@ -1530,7 +1586,7 @@ PUSHA:          LD      HL,STKLMT       ;*** PUSHA ***
                 LD      HL,(LOPVAR)     ;ELSE SAVE LOOP VAR'S
                 LD      A,H     ;BUT IF LOPVAR IS 0
                 OR      L       ;THAT WILL BE ALL
-                JP      Z,PU1
+                JR      Z,PU1
                 LD      HL,(LOPPT)      ;ELSE, MORE TO SAVE
                 PUSH    HL
                 LD      HL,(LOPLN)
@@ -1543,62 +1599,6 @@ PUSHA:          LD      HL,STKLMT       ;*** PUSHA ***
 PU1:            PUSH    HL
                 PUSH    BC      ;BC = RETURN ADDR.
                 RET
-
-;*************************************************************
-; *** INIT ***
-;
-; PUT IO INITIALISATION HERE, E.G. FOR THE SERIAL INTERFACE
-;
-; *** OUTC *** CHKIO ***
-;
-; THESE ARE THE ONLY I/O ROUTINES IN TBI.
-; OUTC WILL OUTPUT THE BYTE IN A.
-; IF THAT IS A CR, A LF IS ALSO SEND OUT.
-; ONLY THE FLAGS MAY BE CHANGED AT RETURN.
-; ALL REGISTERS ARE RESTORED.
-;
-; 'CHKIO' CHECKS THE INPUT.  IF NO INPUT, IT WILL RETURN TO
-; THE CALLER WITH THE Z FLAG SET.  IF THERE IS INPUT, Z FLAG
-; IS CLEARED AND THE INPUT BYTE IS IN A.  HOWEVER, IF THE
-; INPUT IS A CONTROL-O, THE 'OCSW' SWITCH IS COMPLIMENTED, AND
-; Z FLAG IS RETURNED.  IF A CONTROL-C IS READ, 'CHKIO' WILL
-; RESTART TBI AND DO NOT RETURN TO THE CALLER.
-;
-;THIS IS AT LOC. 0
-;START:         LD      SP,STACK        ;*** COLD START ***
-;               LD      A,0FFH
-;               JP      INIT
-
-INIT:           LD      DE,MSG1
-                CALL    PRTSTG
-                LD      HL,START
-                LD      (RANPNT),HL
-                LD      HL,TXTBGN
-                LD      (TXTUNF),HL
-                JP      INIT1
-
-;THIS IS AT LOC. 10
-;OUTC:          OUT     (IODATA),A      ;Out to data port
-;               CP      CR      ;WAS IT CR?
-;               RET     NZ      ;NO, FINISHED
-;               JP      OC1     ;REST OF THIS IS AT OC1
-OC1:            LD      A,LF    ;YES, WE SEND LF TOO
-                RST     ROUTC   ;THIS IS RECURSIVE
-                LD      A,CR    ;GET CR BACK IN A
-                RET
-
-CHKIO:          IN      A,(IOSTAT)      ;*** CHKIO ***
-                AND     IO_RX_BIT       ;MASK STATUS BIT
-                RET     Z       ;NOT READY, RETURN "Z"
-                IN      A,(IODATA)      ;READY, READ DATA
-                AND     7FH     ;MASK BIT 7 OFF
-CI0:            CP      03H     ;IS IT CONTROL-C?
-                RET     NZ      ;NO, RETURN "NZ"
-                JP      WSTART  ;YES, RESTART TBI
-;
-MSG1:           .DB     "TinyBASIC"
-                .DB     CR
-
 
 ;*************************************************************
 ;
@@ -1716,13 +1716,13 @@ TAB2:           ;DIRECT OR PROGRAM STATEMENT
                 DWA(DEFLT)              ;END OF LIST
 ;
 TAB4:           ;FUNCTIONS AND CONSTANTS
-                .DB     "RND"           ;fkt RND(RANGE)
+                .DB     "RND"           ;funct RND(RANGE)
                 DWA(RND)
-                .DB     "ABS"           ;fkt ABS(VALUE)
+                .DB     "ABS"           ;funct ABS(VALUE)
                 DWA(ABS)
-                .DB     "GET"          ;fkt GET(ADR) get byte from memory
+                .DB     "GET"           ;funct GET(ADR) get byte from memory
                 DWA(GET)
-                .DB     "USR"           ;fkt USR(PARA) call usr fkt at TOP
+                .DB     "USR"           ;funct USR(PARA) call usr funct at TOP
                 DWA(USR)                ; and return a result in HL
                 .DB     "SIZE"          ;const SIZE - no parantesis, get free mem
                 DWA(SIZE)
