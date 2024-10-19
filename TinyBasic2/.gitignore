@@ -1,3 +1,6 @@
+# continuous im memory file (=*.bin)
+*.cim
+
 #do not include the original files
 tinybasic2dms.*
 obj2h

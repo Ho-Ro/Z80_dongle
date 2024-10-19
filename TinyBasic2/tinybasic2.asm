@@ -27,6 +27,7 @@
 ;constants RAM (TXTBGN), TOP (TXTEND) and SIZE (TXTEND-TXTUNF)
 ;function USR(para) that calls machine code at TOP (128 bytes free)
 ;with parameter in HL, returning the result in HL, default is RET at TOP
+;Changed to the more authentic zmac syntax (https://github.com/gp48k/zmac)
 ;
 ;*************************************************************
 ;
@@ -54,44 +55,54 @@
 ; SECTION.  THEY CAN BE REACHED ONLY BY 3-BYTE CALLS.
 ;
 
-; Memory map
-ROMBGN          .EQU            $0000           ; Execution must start here
-RAMBGN          .EQU            $0800           ; 2K ROM
+                .Z80
 
-#IFDEF          MAKE_ROM
+; Memory map
+ROMBGN:         .EQU    $0000           ; Execution must start here
+RAMBGN:         .EQU    $0800           ; 2K ROM
+
+.IFDEF           MAKE_ROM
 ; 2K CODE IN ROM and 6.5K DATA IN RAM FOR Z80_dongle
-RAMSZE          .EQU            $1A00
-#ELSE
+RAMSZE:         .EQU    $1A00
+.ELSE
 ; 2K CODE IN RAM & 2K DATA IN RAM AS TEST VERSION
-RAMSZE          .EQU            $0800
-#ENDIF
+RAMSZE:         .EQU    $0800
+.ENDIF
 
 ; IO map
-IODATA          .EQU            1
-IOSTAT          .EQU            2
-IO_RX_BIT       .EQU            $01
+IODATA:         .EQU    1
+IOSTAT:         .EQU    2
+IO_RX_BIT:      .EQU    $01
 
 ; Control character
-BS              .EQU            08H             ; ^H, BACKSPACE
-CR              .EQU            0DH             ; ^M, CARRIAGE RETURN
-LF              .EQU            0AH             ; ^J, LINE FEED
-CAN             .EQU            18H             ; ^X, CANCEL
-DEL             .EQU            7FH             ; DELETE
+BS:             .EQU    $08             ; ^H, BACKSPACE
+CR:             .EQU    $0D             ; ^M, CARRIAGE RETURN
+LF:             .EQU    $0A             ; ^J, LINE FEED
+CAN:            .EQU    $18             ; ^X, CANCEL
+DEL:            .EQU    $7F             ; DELETE
 
 
 ; Store a label address as BIG endian with bit A15 set
-#DEFINE DWA(LABEL) .DB (LABEL >> 8) | $80 \ .DB (LABEL & $FF)
+
+DWA             MACRO   LABEL
+                .DB     (LABEL >> 8) | $80
+                .DB     LABEL & $FF
+                ENDM
 
 ; if CHAR = A THEN JUMP RELATIVE TO LABEL
-#DEFINE TSTCH(CHAR,LABEL) RST RTSTC \ .DB CHAR \ .DB LABEL-$-1
+
+TSTC            MACRO   CHAR,LABEL
+                RST     RTSTC
+                .DB     CHAR
+                .DB     LABEL-$-1
+                ENDM
 
 
-.ORG            ROMBGN
+                .ORG    ROMBGN
 
-
-CSTART:         LD      SP,STACK        ;*** COLD START ***
-                LD      A,$C9           ;"RET", also not an ASCII char
-                JP      INIT            ;as delimiter for PRTSTG
+CSTART:         LD      SP,STACK ;*** COLD START ***
+                LD      A,$C9   ;"RET", also not an ASCII char
+                JP      INIT    ;as delimiter for PRTSTG
 
                 ;*** RST 1 @ $0008 ***
 RTSTC:          EX      (SP),HL
@@ -111,7 +122,7 @@ ROUTC:          OUT     (IODATA),A      ;Out to data port
 REXPR:          CALL    EXPR2
                 PUSH    HL      ;EVALUATE AN EXPRESSION
                 JP      EXPR1   ;REST OF IT AT EXPR1
-.DB             "W"
+                .DB     "W"
 
                 ;*** RST 4 @ $0020 ***
 RCOMP:          LD      A,H
@@ -120,7 +131,7 @@ RCOMP:          LD      A,H
                 LD      A,L     ;Z FLAGS
                 CP      E       ;BUT OLD A IS LOST
                 RET
-.DB             "AN"
+                .DB     "AN"
 
                 ;*** RST 5 @ $0028 ***
 RIGNBLK:        LD      A,(DE)
@@ -133,7 +144,7 @@ RIGNBLK:        LD      A,(DE)
 RFINISH:        POP     AF
                 CALL    FIN     ;CHECK END OF COMMAND
                 JP      QWHAT   ;PRINT "WHAT?" IF WRONG
-.DB             "G"
+                .DB     "G"
 
                 ;*** RST 7 @ $0038 ***
 RTSTV:          RST     RIGNBLK ;IGNBLK
@@ -531,7 +542,7 @@ GOTO:           RST     REXPR   ;*** GOTO EXPR ***
 ; PRINTED OR IF THE LIST IS A NULL LIST.  HOWEVER IF THE LIST
 ; ENDED WITH A COMMA, NO (CRLF) IS GENERATED.
 ;
-LIST:           CALL    TSTNUM  ;TEST IF THERE IS A #
+LIST_:          CALL    TSTNUM  ;TEST IF THERE IS A #
                 CALL    ENDCHK  ;IF NO # WE GET A 0
                 CALL    FNDLN   ;FIND THIS OR NEXT LINE
 LS1:            JP      C,WSTART ;C:PASSED TXTUNF
@@ -543,17 +554,17 @@ LS1:            JP      C,WSTART ;C:PASSED TXTUNF
 PRINT:          LD      C,8     ;C = # OF SPACES
                 XOR     A       ;DEFAULT BASE FOR PRTNUM
                 LD      (PNBASE),A
-                TSTCH(';',PR2)  ;IF NULL LIST & ";"
+                TSTC     ';',PR2 ;IF NULL LIST & ";"
                 CALL    CRLF    ;GIVE CR-LF AND
                 JP      RUNSML  ;CONTINUE SAME LINE
-PR2:            TSTCH(CR,PR0)   ;IF NULL LIST (CR)
+PR2:            TSTC     CR,PR0  ;IF NULL LIST (CR)
                 CALL    CRLF    ;ALSO GIVE CR-LF AND
                 JP      RUNNXL  ;GO TO NEXT LINE
-PR0:            TSTCH('#',PR5)  ;ELSE IS IT FORMAT?
+PR0:            TSTC     '#',PR5 ;ELSE IS IT FORMAT?
                 RST     REXPR   ;YES, EVALUATE EXPR.
                 LD      C,L     ;AND SAVE IT IN C
                 JR      PR3     ;LOOK FOR MORE TO PRINT
-PR5:            TSTCH('%',PR1)  ;ELSE IS IT PRTNUM BASE?
+PR5:            TSTC     '%',PR1 ;ELSE IS IT PRTNUM BASE?
                 RST     REXPR   ;YES, EVALUATE EXPR.
                 LD      A,L     ;GET THE LOW PART
                 CP      1       ;EITHER 0 OR >= 2?
@@ -564,7 +575,7 @@ PR5:            TSTCH('%',PR1)  ;ELSE IS IT PRTNUM BASE?
                 JR      PR3     ;LOOK FOR MORE TO PRINT
 PR1:            CALL    QTSTG   ;OR IS IT A STRING?
                 JP      PR8     ;HACK JP!! IF NOT, MUST BE EXPR.
-PR3:            TSTCH($2C,PR6)  ;IF ",", GO FIND NEXT
+PR3:            TSTC     $2C,PR6 ;IF ",", GO FIND NEXT
                 CALL    FIN     ;IN THE LIST.
                 JR      PR0     ;LIST CONTINUES
 PR6:            XOR     A       ;END OF LIST REACHED
@@ -793,9 +804,9 @@ NX2:            CALL    POPA            ;PURGE THIS LOOP
 ; THIS IS DONE BY 'DEFLT'.
 ;
 REM:            LD      HL,0H   ;*** REM ***
-.DB             3EH             ;SKIP RST, THIS IS LIKE 'IF 0'
+                .DB     3EH             ;SKIP RST, THIS IS LIKE 'IF 0'
 ;
-IFF:            RST     REXPR   ;*** IF ***
+IF_:            RST     REXPR   ;*** IF ***
                 LD      A,H     ;IS THE EXPR.=0?
                 OR      L
                 JP      NZ,RUNSML       ;NO, CONTINUE
@@ -855,7 +866,7 @@ IP3:            PUSH    DE      ;SAVE TEXT POINTER
                 LD      (CURRNT),HL
                 POP     DE      ;AND OLD TEXT POINTER
 IP4:            POP     AF      ;PURGE JUNK IN STACK
-                TSTCH($2C,IP5)  ;IS NEXT CH. ','?
+                TSTC     $2C,IP5 ;IS NEXT CH. ','?
                 JR      IP1     ;YES, MORE ITEMS.
 IP5:            RST     RFINISH
 ;
@@ -864,7 +875,7 @@ DEFLT:          LD      A,(DE)  ;***  DEFLT ***
                 JR      Z,LT1   ;ELSE IT IS 'LET'
 ;
 LET:            CALL    SETVAL  ;*** LET ***
-                TSTCH($2C,LT1)  ;SET VALUE TO VAR.
+                TSTC    $2C,LT1  ;SET VALUE TO VAR.
                 JR      LET     ;ITEM BY ITEM
 LT1:            RST     RFINISH ;UNTIL FINISH
 ;
@@ -944,13 +955,13 @@ XP18:           LD      A,C     ;SUBROUTINE FOR ALL
                 LD      A,1
                 RET
 ;
-EXPR2:          TSTCH('-',XP21) ;NEGATIVE SIGN?
+EXPR2:          TSTC    '-',XP21 ;NEGATIVE SIGN?
                 LD      HL,0H   ;YES, FAKE '0-'
                 JR      XP26    ;TREAT LIKE SUBTRACT
 ;
-XP21:           TSTCH('+',XP22) ;POSITIVE SIGN? IGNORE
+XP21:           TSTC    '+',XP22 ;POSITIVE SIGN? IGNORE
 XP22:           CALL    EXPR3   ;1ST <EXPR3>
-XP23:           TSTCH('+',XP25) ;ADD?
+XP23:           TSTC    '+',XP25 ;ADD?
                 PUSH    HL      ;YES, SAVE VALUE
                 CALL    EXPR3   ;GET 2ND <EXPR3>
 XP24:           EX      DE,HL   ;2ND IN DE
@@ -966,14 +977,14 @@ XP24:           EX      DE,HL   ;2ND IN DE
 ;
                 JP      QHOW    ;ELSE WE HAVE OVERFLOW
 ;
-XP25:           TSTCH('-',XP42) ;SUBTRACT?
+XP25:           TSTC    '-',XP42 ;SUBTRACT?
 XP26:           PUSH    HL      ;YES, SAVE 1ST <EXPR3>
                 CALL    EXPR3   ;GET 2ND <EXPR3>
                 CALL    CHGSGN  ;NEGATE
                 JR      XP24    ;AND ADD THEM
 ;
 EXPR3:          CALL    EXPR4   ;GET 1ST <EXPR4>
-XP31:           TSTCH('*',XP34) ;MULTIPLY?
+XP31:           TSTC    '*',XP34 ;MULTIPLY?
                 PUSH    HL      ;YES, SAVE 1ST
                 CALL    EXPR4   ;AND GET 2ND <EXPR4>
                 LD      B,0H    ;CLEAR B FOR SIGN
@@ -994,12 +1005,12 @@ XP32:           LD      A,L     ;THIS IS DUMB
                 OR      A       ;ADD AND COUNT
                 JR      Z,XP35
 XP33:           ADD     HL,DE
-                JR      C,AHOW  ;OVERFLOW
+                JP      C,AHOW  ;OVERFLOW
                 DEC     A
                 JR      NZ,XP33
                 JR      XP35    ;FINISHED
 ;
-XP34:           TSTCH('/',XP42) ;DIVIDE?
+XP34:           TSTC    '/',XP42 ;DIVIDE?
                 PUSH    HL      ;YES, SAVE 1ST <EXPR4>
                 CALL    EXPR4   ;AND GET THE SECOND ONE
                 LD      B,0H    ;CLEAR B FOR SIGN
@@ -1041,9 +1052,9 @@ XP41:           CALL    TSTNUM  ;OR IS IT A NUMBER
                 LD      A,B     ;# OF DIGIT
                 OR      A
                 RET     NZ      ;OK
-PARN:           TSTCH($28,XP43) ; '('
+PARN:           TSTC    $28,XP43 ; '('
                 RST     REXPR   ;"(EXPR)"
-                TSTCH($29,XP43) ; ')'
+                TSTC    $29,XP43 ; ')'
 XP42:           RET
 XP43:           JP      QWHAT   ;ELSE SAY: "WHAT?"
 
@@ -1110,13 +1121,13 @@ TOP:            LD      HL,TXTEND ; *** TOP *** END OF TEXT AREA
                 RET
 
 PUT:            RST     REXPR   ;*** PUT ADDR, VAL1 [,VAL2, VAL3,..]
-                TSTCH($2C,PT2)  ; 1ST ',' SEPARATES THE VALUE(S)
+                TSTC    $2C,PT2  ; 1ST ',' SEPARATES THE VALUE(S)
                 PUSH    HL      ;SAVE ADDR
 PT0:            RST     REXPR   ;GET VAL IN HL
                 LD      A,L     ;LOW BYTE OF VAL
                 POP     HL      ;GET ADDR
                 LD      (HL),A  ;PUT VALUE IN RAM
-                TSTCH($2C,PT1)  ;READY UNLESS ","
+                TSTC    $2C,PT1 ;READY UNLESS ","
                 INC     HL      ;NEXT ADDR
                 PUSH    HL
                 JR      PT0     ;LIST CONTINUES
@@ -1125,7 +1136,7 @@ PT1:            RST     RFINISH ;READY
 ;
 PT2:            JP      QWHAT   ;ELSE SAY: "WHAT?"
 
-HALT:           HALT            ;HALT CPU (return to analyser)
+HALT_:          HALT            ;HALT CPU (return to analyser)
 
 ;
 ;*************************************************************
@@ -1229,7 +1240,7 @@ CK1:            RST     RCOMP
 SETVAL:         RST     RTSTV   ;*** SETVAL ***
                 JR      C,QWHAT ;"WHAT?" NO VARIABLE
                 PUSH    HL      ;SAVE ADDRESS OF VAR.
-                TSTCH('=',QWHAT)  ;PASS "=" SIGN
+                TSTC    '=',QWHAT ;PASS "=" SIGN
                 RST     REXPR   ;EVALUATE EXPR.
                 LD      B,H     ;VALUE IS IN BC NOW
                 LD      C,L
@@ -1239,10 +1250,10 @@ SETVAL:         RST     RTSTV   ;*** SETVAL ***
                 LD      (HL),B
                 RET
 
-FIN:            TSTCH(';',FI1)  ;*** FIN ***
+FIN:            TSTC    ';',FI1 ;*** FIN ***
                 POP     AF      ;";", PURGE RET. ADDR.
                 JP      RUNSML  ;CONTINUE SAME LINE
-FI1:            TSTCH(CR,FI2)   ;NOT ";", IS IT CR?
+FI1:            TSTC    CR,FI2  ;NOT ";", IS IT CR?
                 POP     AF      ;YES, PURGE RET. ADDR.
                 JP      RUNNXL  ;RUN NEXT LINE
 FI2:            RET             ;ELSE RETURN TO CALLER
@@ -1416,7 +1427,7 @@ PS1:            LD      A,(DE)  ;GET A CHARACTER
                 JR      NZ,PS1  ;NO, NEXT
                 RET             ;YES, RETURN
 ;
-QTSTG:          TSTCH($22,QT3)  ;*** QTSTG ***
+QTSTG:          TSTC    $22,QT3 ;*** QTSTG ***
                 LD      A,22H   ;IT IS A '"'
 QT1:            CALL    PRTSTG  ;PRINT UNTIL ANOTHER
 QT1A:           CP      CR      ;WAS LAST ONE A CR?
@@ -1427,17 +1438,17 @@ QT2:            INC     HL       ; !! SKIP 3 BYTES ON RETURN
                 INC     HL       ; !!    MUST BE "JP .."
                 JP      (HL)     ; !! RETURN AFTER THIS "JP"
 ;
-QT3:            TSTCH($27,QT4)  ;IS IT A "'"?
+QT3:            TSTC    $27,QT4 ;IS IT A "'"?
                 LD      A,27H   ;YES, DO THE SAME
                 JR      QT1     ;AS IN '"'
 ;
-QT4:            TSTCH($5F,QT5)  ;IS IT UNDERLINE?
+QT4:            TSTC    $5F,QT5 ;IS IT UNDERLINE?
                 LD      A,08DH  ;YES, CR WITHOUT LF
                 RST     ROUTC
                 POP     HL      ;HACK RETURN ADDRESS
                 JR      QT2
 ;
-QT5:            TSTCH(5EH,QT6)  ;RST 1, is it '^'?
+QT5:            TSTC    5EH,QT6 ;RST 1, is it '^'?
                 LD      A,(DE)  ;CHR
                 XOR     40H     ;CONVERT TO CTRL
                 RST     ROUTC
@@ -1655,9 +1666,9 @@ EX5:            LD      A,(HL)  ;LOAD HL WITH THE JUMP
                 LD      L,(HL)
                                 ;ADDRESSES ARE BIG-ENDIAN
                                 ;WITH MSB SET to 1
-#IF             $ < 8000H
+                .IF      $ < 8000H
                 AND     7FH     ;MASK OFF HIGH ADDRESS BIT
-#ENDIF
+                .ENDIF
                 LD      H,A
                 POP     AF      ;CLEAN UP THE GARBAGE
                 JP      (HL)    ;AND WE GO DO IT
@@ -1678,141 +1689,139 @@ EX5:            LD      A,(HL)  ;LOAD HL WITH THE JUMP
 ;
 TAB1:           ;DIRECT ONLY COMMANDS
                 .DB     "LIST"
-                DWA(LIST)
+                DWA     LIST_
                 .DB     "RUN"
-                DWA(RUN)
+                DWA     RUN
                 .DB     "NEW"
-                DWA(NEW)
+                DWA     NEW
 ;
 TAB2:           ;DIRECT OR PROGRAM STATEMENT
                 .DB     "NEXT"
-                DWA(NEXT)
+                DWA     NEXT
                 .DB     "LET"           ; can be omitted
-                DWA(LET)
+                DWA     LET
                 .DB     "IF"
-                DWA(IFF)
+                DWA     IF_
                 .DB     "GOTO"
-                DWA(GOTO)
+                DWA     GOTO
                 .DB     "GOSUB"
-                DWA(GOSUB)
+                DWA     GOSUB
                 .DB     "RETURN"
-                DWA(RETURN)
+                DWA     RETURN
                 .DB     "REM"
-                DWA(REM)
+                DWA     REM
                 .DB     "FOR"
-                DWA(FOR)
+                DWA     FOR
                 .DB     "INPUT"         ; wait for KBD input
-                DWA(INPUT)
+                DWA     INPUT
                 .DB     "PRINT"
-                DWA(PRINT)
+                DWA     PRINT
                 .DB     "?"             ; short for PRINT
-                DWA(PRINT)
+                DWA     PRINT
                 .DB     "PUT"           ; PUT ADDR, VAL, VAL,...
-                DWA(PUT)
+                DWA     PUT
                 .DB     "STOP"          ; warm start
-                DWA(STOP)
+                DWA     STOP
                 .DB     "HALT"          ; HALT CPU (return to analyser)
-                DWA(HALT)
-                DWA(DEFLT)              ;END OF LIST
+                DWA     HALT_
+                DWA     DEFLT           ;END OF LIST
 ;
 TAB4:           ;FUNCTIONS AND CONSTANTS
                 .DB     "RND"           ;funct RND(RANGE)
-                DWA(RND)
+                DWA     RND
                 .DB     "ABS"           ;funct ABS(VALUE)
-                DWA(ABS)
+                DWA     ABS
                 .DB     "GET"           ;funct GET(ADR) get byte from memory
-                DWA(GET)
+                DWA     GET
                 .DB     "USR"           ;funct USR(PARA) call usr funct at TOP
-                DWA(USR)                ; and return a result in HL
+                DWA     USR                ; and return a result in HL
                 .DB     "SIZE"          ;const SIZE - no parantesis, get free mem
-                DWA(SIZE)
+                DWA     SIZE
                 .DB     "RAM"           ;const RAM - no par., get TEXT begin
-                DWA(RAM)
+                DWA     RAM
                 .DB     "TOP"           ;const TOP - no par., get TEXT TOP
-                DWA(TOP)
-                DWA(XP40)               ;END OF LIST
+                DWA     TOP
+                DWA     XP40            ;END OF LIST
 ;
 TAB5:           ;"TO" IN "FOR"
                 .DB     "TO"
-                DWA(FR1)
-                DWA(QWHAT)              ;END OF LIST
+                DWA     FR1
+                DWA     QWHAT           ;END OF LIST
 ;
 TAB6:           ;"STEP" IN "FOR"
                 .DB     "STEP"
-                DWA(FR2)
-                DWA(FR3)                ;END OF LIST
+                DWA     FR2
+                DWA     FR3             ;END OF LIST
 ;
 TAB8:           ;RELATION OPERATORS
                 .DB     ">="
-                DWA(XP11)
+                DWA     XP11
                 .DB     "!="
-                DWA(XP12)
+                DWA     XP12
                 .DB     "#"
-                DWA(XP12)
+                DWA     XP12
                 .DB     ">"
-                DWA(XP13)
+                DWA     XP13
                 .DB     "=="
-                DWA(XP15)
+                DWA     XP15
                 .DB     "="
-                DWA(XP15)
+                DWA     XP15
                 .DB     "<="
-                DWA(XP14)
+                DWA     XP14
                 .DB     "<"
-                DWA(XP16)
-                DWA(XP17)               ;END OF REL OPERATOR LIST
+                DWA     XP16
+                DWA     XP17            ;END OF REL OPERATOR LIST
+
 ;
 LSTROM:                                 ;ALL ABOVE CAN BE ROM
 
-; Check if the program code overflows the ROM size
 ;
-#IF $ > RAMBGN
-                .ECHO   "\n\n*** The ROM section is "
-                .ECHO   $ - RAMBGN
-                .ECHO   " bytes too long! ***\n\n\n"
-#ELSE
-                .ECHO   "ROM size: "
-                .ECHO   $
-                .ECHO   " bytes\n"
-#ENDIF
+; CHECK THAT THE PROGRAM DOES NOT EXCEED ROM SIZE
+;
+                .ASSERT $ <= RAMBGN
+
+
+                .DC     RAMBGN-$,$00    ;fill with $00 until RAMBGN
 ;
 ;
 ;*************************************************************
 
+                .ASSERT $ <= RAMBGN
 
-                .ORG            RAMBGN          ;HERE DOWN MUST BE RAM
+                .ORG    RAMBGN          ;HERE DOWN MUST BE RAM
 
 ;*************************************************************
 ;
 ;
 TXTBGN:
 ;
-                .ORG            RAMBGN+RAMSZE-$200
+                .ORG    RAMBGN+RAMSZE-$200
 ;
-TXTEND:         .EQU            $               ;TEXT SAVE AREA ENDS
-                                                ;VARIABLEs '@(0)', '@(1), @(2)
-                                                ;... stored top-down
-                                                ;i.e. &@(i) = TXTEND-2-2*i
-USRSPC:         .DS             128
+TXTEND:         .EQU    $               ;TEXT SAVE AREA ENDS
+                                        ;VARIABLEs '@(0)', '@(1), @(2)
+                                        ;... stored top-down
+                                        ;i.e. &@(i) = TXTEND-2-2*i
+USRSPC:         .DS     128
 ;
-VARBGN:         .DS             2*26            ;VARIABLES 'A'..'Z'
-OCSW:           .DS             1               ;SWITCH FOR OUTPUT
-PNBASE:         .DS             1               ;BASE FOR PRTNUM
-TXTUNF:         .DS             2               ;->UNFILLED TEXT AREA
-CURRNT:         .DS             2               ;POINTS TO CURRENT LINE
-STKGOS:         .DS             2               ;SAVES SP IN 'GOSUB'
-VARNXT:         .DS             2               ;TEMP STORAGE
-STKINP:         .DS             2               ;SAVES SP IN 'INPUT'
-LOPVAR:         .DS             2               ;'FOR' LOOP SAVE AREA
-LOPINC:         .DS             2               ;INCREMENT
-LOPLMT:         .DS             2               ;LIMIT
-LOPLN:          .DS             2               ;LINE NUMBER
-LOPPT:          .DS             2               ;TEXT POINTER
-RANPNT:         .DS             2               ;RANDOM NUMBER POINTER
-BUFFER:         .DS             80              ;INPUT BUFFER
-BUFEND:         .DS             1               ;BUFFER ENDS
-STKLMT:         .DS             1               ;TOP LIMIT FOR STACK
+VARBGN:         .DS     2*26            ;VARIABLES 'A'..'Z'
+OCSW:           .DS     1               ;SWITCH FOR OUTPUT
+PNBASE:         .DS     1               ;BASE FOR PRTNUM
+TXTUNF:         .DS     2               ;->UNFILLED TEXT AREA
+CURRNT:         .DS     2               ;POINTS TO CURRENT LINE
+STKGOS:         .DS     2               ;SAVES SP IN 'GOSUB'
+VARNXT:         .DS     2               ;TEMP STORAGE
+STKINP:         .DS     2               ;SAVES SP IN 'INPUT'
+LOPVAR:         .DS     2               ;'FOR' LOOP SAVE AREA
+LOPINC:         .DS     2               ;INCREMENT
+LOPLMT:         .DS     2               ;LIMIT
+LOPLN:          .DS     2               ;LINE NUMBER
+LOPPT:          .DS     2               ;TEXT POINTER
+RANPNT:         .DS     2               ;RANDOM NUMBER POINTER
+BUFFER:         .DS     80              ;INPUT BUFFER
+BUFEND:         .DS     1               ;BUFFER ENDS
+STKLMT:         .DS     1               ;TOP LIMIT FOR STACK
 ;
-                .ORG            RAMBGN+RAMSZE   ;RAM END
-STACK:          .EQU            $               ;STACK STARTS HERE
+                .ORG    RAMBGN+RAMSZE   ;RAM END
+STACK:          .EQU    $               ;STACK STARTS HERE
 ;
                 .END

@@ -904,7 +904,7 @@ and the functions `ABS(n)` and `RND(n)`.
 
 Originally written in 8080 syntax I converted it to the nicer Z80 syntax using the
 [8080 z80](https://hc-ddr.hucki.net/wiki/doku.php/cpm/8080_z80) tool and assembled it with the
-[uz80as](https://github.com/jorgicor/uz80as) assembler (that besides Z80 supports a lot of other processors).
+[zmac](https://github.com/gp48k/zmac) assembler (with [one fix](https://github.com/Ho-Ro/zmac/tree/fix_hash)).
 I also added some HW-oriented functionality like `GET(addr)`, `PUT addr,val,val,...`
 as well as hex constants that are written as `$xxxx` and the possibility to print values as `uint16_t`
 in different number bases n=2..16 using the format specifier `%n`, e.g.
