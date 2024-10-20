@@ -45,6 +45,7 @@
 //  Li Chen Wang's Tiny Basic ROM
 #include "TinyBasic2.h"
 
+#include "opcode.h"
 
 const uint32_t BAUDRATE = 115200;
 
@@ -376,6 +377,19 @@ void DumpState( bool suppress ) {
     extraInfo[ 0 ] = 0;
 }
 
+static bool CB = false;
+static bool DD = false;
+static bool ED = false;
+static bool FD = false;
+
+static bool isPrefix( uint8_t data ) { return data == 0xCB || data == 0xDD || data == 0xED || data == 0xFD; }
+
+static bool isCB() { return CB; }
+static bool isDD() { return DD; }
+static bool isDDCB() { return DD && CB; }
+static bool isED() { return ED; }
+static bool isFD() { return FD; }
+static bool isFDCB() { return FD && CB; }
 
 //--------------------------------------------------------
 // Trace/simulation control handler
@@ -789,8 +803,52 @@ void loop() {
                 data = RAM[ ab - ramBegin ];
             SetDataToDB( data );
             if ( !m1 ) {
+                const char *opc;
                 m1Address = ab;
-                sprintf( extraInfo, "Opcode read from %s %04X -> %02X", ab < ramBegin ? "ROM" : "RAM", ab, data );
+                sprintf( extraInfo, "Opcode read from %s %04X -> %02X  ",
+                    ab < ramBegin ? "ROM" : "RAM", ab, data
+                );
+                if ( data == 0xCB ) {
+                    CB = true;
+                    ED = false;
+                }
+                else if ( data == 0xDD ) {
+                    CB = false;
+                    DD = true;
+                    ED = false;
+                    FD = false;
+                }
+                else if ( data == 0xED ) {
+                    CB = false;
+                    DD = false;
+                    ED = true;
+                    FD = false;
+                }
+                else if ( data == 0xFD ) {
+                    CB = false;
+                    ED = false;
+                    DD = false;
+                    FD = true;
+                }
+                if ( isPrefix( data ) )
+                    opc = opcode[ data ];
+                else if ( isDDCB() )
+                    opc = prefixDDCB[ data ];
+                else if ( isFDCB() )
+                    opc = prefixFDCB[ data ];
+                else if ( isCB() )
+                    opc = prefixCB[ data ];
+                else if ( isDD() )
+                    opc = prefixDD[ data ];
+                else if ( isED() )
+                    opc = prefixED[ data ];
+                else if ( isFD() )
+                    opc = prefixFD[ data ];
+                else
+                    opc = opcode[ data ];
+                strlcpy_P( extraInfo+strlen( extraInfo ), (PROGMEM const char*)opc, 16 );
+                if ( !isPrefix( data ) ) // clear all prefixes
+                    CB = DD = ED = FD = false;
             } else {
                 sprintf( extraInfo, "Memory read from %s %04X -> %02X", ab < ramBegin ? "ROM" : "RAM", ab, data );
             }
@@ -834,8 +892,9 @@ void loop() {
             GetDataFromDB();
             IO[ ab & ioMask ] = db;
             sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
-                 ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
+            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) )
+              || ( analyseBasic == 't' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) )
+              || ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
                 sprintf( extraInfo + strlen( extraInfo ), "  CONOUT: %c", isprint( db ) ? db : ' ' );
         }
 
