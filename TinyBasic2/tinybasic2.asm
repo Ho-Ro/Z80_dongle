@@ -1114,10 +1114,13 @@ USR:            CALL    PARN    ;*** USR(PARA) ***
 ;               RET             ;$C9 - RET to BASIC
 ;                               ;DEFAULT: (USRSPC)=$C9
 
-RAM:            LD      HL,TXTBGN ; *** RAM *** START OF TEXT AREA
+RAM:            LD      HL,RAMBGN ; *** RAM *** VARIABLES 'A'..'Z'
                 RET
 
-TOP:            LD      HL,TXTEND ; *** TOP *** END OF TEXT AREA
+TXT:            LD      HL,TXTBGN ; *** TXT *** BEGIN OF TXT AREA
+                RET
+
+TOP:            LD      HL,TXTEND ; *** TOP *** END OF TEXT AREA = USRSPC
                 RET
 
 PUT:            RST     REXPR   ;*** PUT ADDR, VAL1 [,VAL2, VAL3,..]
@@ -1737,9 +1740,11 @@ TAB4:           ;FUNCTIONS AND CONSTANTS
                 DWA     USR                ; and return a result in HL
                 .DB     "SIZE"          ;const SIZE - no parantesis, get free mem
                 DWA     SIZE
-                .DB     "RAM"           ;const RAM - no par., get TEXT begin
+                .DB     "RAM"           ;const RAM - no par., get RAM begin = 'A'..'Z'
                 DWA     RAM
-                .DB     "TOP"           ;const TOP - no par., get TEXT TOP
+                .DB     "TXT"           ;const TXT - no par., get TEXT begin
+                DWA     TXT
+                .DB     "TOP"           ;const TOP - no par., get TEXT TOP = USRSPC
                 DWA     TOP
                 DWA     XP40            ;END OF LIST
 ;
@@ -1786,23 +1791,11 @@ LSTROM:                                 ;ALL ABOVE CAN BE ROM
 ;
 ;*************************************************************
 
-                .ASSERT $ <= RAMBGN
-
                 .ORG    RAMBGN          ;HERE DOWN MUST BE RAM
-
+;
 ;*************************************************************
 ;
-;
-TXTBGN:
-;
-                .ORG    RAMBGN+RAMSZE-$200
-;
-TXTEND:         .EQU    $               ;TEXT SAVE AREA ENDS
-                                        ;VARIABLEs '@(0)', '@(1), @(2)
-                                        ;... stored top-down
-                                        ;i.e. &@(i) = TXTEND-2-2*i
-USRSPC:         .DS     128
-;
+
 VARBGN:         .DS     2*26            ;VARIABLES 'A'..'Z'
 OCSW:           .DS     1               ;SWITCH FOR OUTPUT
 PNBASE:         .DS     1               ;BASE FOR PRTNUM
@@ -1817,11 +1810,25 @@ LOPLMT:         .DS     2               ;LIMIT
 LOPLN:          .DS     2               ;LINE NUMBER
 LOPPT:          .DS     2               ;TEXT POINTER
 RANPNT:         .DS     2               ;RANDOM NUMBER POINTER
-BUFFER:         .DS     80              ;INPUT BUFFER
-BUFEND:         .DS     1               ;BUFFER ENDS
-STKLMT:         .DS     1               ;TOP LIMIT FOR STACK
+STKLMT:         .EQU    $               ;LIMIT FOR STACK
+
+                .ORG    RAMBGN+$100
 ;
-                .ORG    RAMBGN+RAMSZE   ;RAM END
-STACK:          .EQU    $               ;STACK STARTS HERE
+STACK:                                  ;STACK STARTS HERE AND GROWS DOWN
+
+TXTBGN:                                 ;TEXT STARTS HERE AND GROWS UP
 ;
+
+                .ORG    RAMBGN+RAMSZE-$100
+TXTEND:                                 ;TEXT SAVE AREA ENDS
+;
+                                        ;VARIABLES @(0), @(1), @(2)
+                                        ;... stored top-down
+                                        ;i.e. &@(i) = TXTEND-2-2*i
+;
+USRSPC:         .DS     128
+
+BUFFER:         .DS     127             ;INPUT BUFFER
+BUFEND:         .DS     1               ;BUFFER END
+
                 .END
