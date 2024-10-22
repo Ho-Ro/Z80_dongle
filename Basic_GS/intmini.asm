@@ -36,7 +36,7 @@ CS              .EQU    0CH             ; Clear screen
 RST00:          DI                      ;Disable interrupts
                 JP      INIT            ;Initialize Hardware and go
 
-                .FILL   0008H-$,0       ; Padding so RST8 starts at org 0x0008H
+                .DC     0008H-$,0       ; Padding so RST8 starts at org 0x0008H
 
 ;------------------------------------------------------------------------------
 ; TX a character over RS232
@@ -45,7 +45,7 @@ RST00:          DI                      ;Disable interrupts
 RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
                 RET
 
-                .FILL   0010H-$,0       ; Padding so RST10 starts at org 0x0010H
+                .DC     0010H-$,0       ; Padding so RST10 starts at org 0x0010H
 
 ;------------------------------------------------------------------------------
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
@@ -56,7 +56,7 @@ RST10:          RST     $18
                 IN      A,(DATA6850)     ; 6850 Receive Data Register
                 RET
 
-                .FILL   0018H-$,0
+                .DC     0018H-$,0
 
 ;------------------------------------------------------------------------------
 ; Check serial status
@@ -66,7 +66,7 @@ RST18:          IN      A,(STAT6850)    ; 6850 Status Register
                 OR      A               ; 6850 Receive Data Register Full
                 RET
 
-                .FILL   0020H-$,0
+                .DC     0020H-$,0
 
 ;------------------------------------------------------------------------------
 ; Output string
@@ -120,6 +120,6 @@ SIGNON1:        .DB     CS
 SIGNON2:        .DB     CR,LF
                 .DB     "(C)old or (W)arm start?",0
 
-                .FILL   (00150H - $), 0
+                .DC     (00150H - $), 0
 
 .END

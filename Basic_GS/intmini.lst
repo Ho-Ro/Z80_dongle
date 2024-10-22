@@ -1,182 +1,169 @@
-0001   0000             ;==================================================================================
-0002   0000             ; Contents of this file are copyright Grant Searle
-0003   0000             ;
-0004   0000             ; You have permission to use this for NON COMMERCIAL USE ONLY
-0005   0000             ; If you wish to use it elsewhere, please include an acknowledgement to myself.
-0006   0000             ;
-0007   0000             ; http://searle.hostei.com/grant/index.html
-0008   0000             ;
-0009   0000             ; eMail: home.micros01@btinternet.com
-0010   0000             ;
-0011   0000             ; If the above don't work, please perform an Internet search to see if I have
-0012   0000             ; updated the web page hosting service.
-0013   0000             ;
-0014   0000             ;==================================================================================
-0015   0000             
-0016   0000             ramBegin        .EQU    02000H
-0017   0000             basicStarted    .EQU    ramBegin + 2
-0018   0000             TEMPSTACK       .EQU    020EDH          ; Top of BASIC line input buffer so is "free ram" when BASIC resets
-0019   0000             
-0020   0000             ; Minimum 6850 ACIA polled serial I/O
-0021   0000             
-0022   0000             DATA6850        .EQU    01H             ; ACIA 6850 Data Register
-0023   0000             STAT6850        .EQU    02H             ; ACIA 6850 Status Register
-0024   0000             
-0025   0000             ; Control character
-0026   0000             
-0027   0000             CR              .EQU    0DH
-0028   0000             LF              .EQU    0AH
-0029   0000             CS              .EQU    0CH             ; Clear screen
-0030   0000             
-0031   0000             ;------------------------------------------------------------------------------
-0032   0000             ; Reset - Here we go
-0033   0000             
-0034   0000                             .ORG    0000
-0035   0000             
-0036   0000 F3          RST00:          DI                      ;Disable interrupts
-0037   0001 C3 28 00                    JP      INIT            ;Initialize Hardware and go
-0038   0004             
-0039   0004 00 00 00 00                 .FILL   0008H-$,0       ; Padding so RST8 starts at org 0x0008H
-0040   0008             
-0041   0008             ;------------------------------------------------------------------------------
-0042   0008             ; TX a character over RS232
-0043   0008             
-0044   0008                             .ORG    0008H
-0045   0008 D3 01       RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
-0046   000A C9                          RET
-0047   000B             
-0048   000B 00 00 00 00                 .FILL   0010H-$,0       ; Padding so RST10 starts at org 0x0010H
-0048   000F 00 
-0049   0010             
-0050   0010             ;------------------------------------------------------------------------------
-0051   0010             ; RX a character over RS232 Channel A [Console], hold here until char ready.
-0052   0010             
-0053   0010                             .ORG    0010H
-0054   0010 DF          RST10:          RST     $18
-0055   0011 28 FD                       JR      Z,RST10
-0056   0013 DB 01                       IN      A,(DATA6850)     ; 6850 Receive Data Register
-0057   0015 C9                          RET
-0058   0016             
-0059   0016 00 00                       .FILL   0018H-$,0
-0060   0018             
-0061   0018             ;------------------------------------------------------------------------------
-0062   0018             ; Check serial status
-0063   0018             
-0064   0018                             .ORG    0018H
-0065   0018 DB 02       RST18:          IN      A,(STAT6850)    ; 6850 Status Register
-0066   001A B7                          OR      A               ; 6850 Receive Data Register Full
-0067   001B C9                          RET
-0068   001C             
-0069   001C 00 00 00 00                 .FILL   0020H-$,0
-0070   0020             
-0071   0020             ;------------------------------------------------------------------------------
-0072   0020             ; Output string
-0073   0020                             .ORG 0020H
-0074   0020 7E          PRINT:          LD      A,(HL)          ; Get character
-0075   0021 B7                          OR      A               ; Is it $00 ?
-0076   0022 C8                          RET     Z               ; Then RETurn on terminator
-0077   0023 CF                          RST     08H             ; Print it
-0078   0024 23                          INC     HL              ; Next Character
-0079   0025 18 F9                       JR      PRINT           ; Continue until $00
-0080   0027 C9                          RET
-0081   0028             
-0082   0028             ;------------------------------------------------------------------------------
-0083   0028             
-0084   0028             INIT:
-0085   0028 21 ED 20                    LD      HL,TEMPSTACK    ; Temp stack
-0086   002B F9                          LD      SP,HL           ; Set up a temporary stack
-0087   002C             
-0088   002C 21 63 00                    LD      HL,SIGNON1      ; Sign-on message
-0089   002F CD 20 00                    CALL    PRINT           ; Output string
-0090   0032 3A 02 20                    LD      A,(basicStarted); Check the BASIC STARTED flag
-0091   0035 FE 59                       CP      'Y'             ; to see if this is power-up
-0092   0037 20 14                       JR      NZ,COLDSTART    ; If not BASIC started then always do cold start
-0093   0039 21 7E 00                    LD      HL,SIGNON2      ; Cold/warm message
-0094   003C CD 20 00                    CALL    PRINT           ; Output string
-0095   003F             CORW:
-0096   003F D7                          RST     10H
-0097   0040 E6 DF                       AND     11011111B       ; lower to uppercase
-0098   0042 FE 43                       CP      'C'
-0099   0044 20 0F                       JR      NZ, CHECKWARM
-0100   0046 CF                          RST     08H
-0101   0047 3E 0D                       LD      A,0DH
-0102   0049 CF                          RST     08H
-0103   004A 3E 0A                       LD      A,0AH
-0104   004C CF                          RST     08H
-0105   004D 3E 59       COLDSTART:      LD      A,'Y'           ; Set the BASIC STARTED flag
-0106   004F 32 02 20                    LD      (basicStarted),A
-0107   0052 C3 50 01                    JP      0150H           ; Start BASIC COLD
-0108   0055             CHECKWARM:
-0109   0055 FE 57                       CP      'W'
-0110   0057 20 E6                       JR      NZ, CORW
-0111   0059 CF                          RST     08H
-0112   005A 3E 0D                       LD      A,0DH
-0113   005C CF                          RST     08H
-0114   005D 3E 0A                       LD      A,0AH
-0115   005F CF                          RST     08H
-0116   0060 C3 53 01                    JP      0153H           ; Start BASIC WARM
-0117   0063             
-0118   0063 0C          SIGNON1:        .DB     CS
-0119   0064 5A 38 30 20                 .DB     "Z80 SBC By Grant Searle",CR,LF,0
-0119   0068 53 42 43 20 
-0119   006C 42 79 20 47 
-0119   0070 72 61 6E 74 
-0119   0074 20 53 65 61 
-0119   0078 72 6C 65 0D 
-0119   007C 0A 00 
-0120   007E 0D 0A       SIGNON2:        .DB     CR,LF
-0121   0080 28 43 29 6F                 .DB     "(C)old or (W)arm start?",0
-0121   0084 6C 64 20 6F 
-0121   0088 72 20 28 57 
-0121   008C 29 61 72 6D 
-0121   0090 20 73 74 61 
-0121   0094 72 74 3F 00 
-0122   0098             
-0123   0098 00 00 00 00                 .FILL   (00150H - $), 0
-0123   009C 00 00 00 00 
-0123   00A0 00 00 00 00 
-0123   00A4 00 00 00 00 
-0123   00A8 00 00 00 00 
-0123   00AC 00 00 00 00 
-0123   00B0 00 00 00 00 
-0123   00B4 00 00 00 00 
-0123   00B8 00 00 00 00 
-0123   00BC 00 00 00 00 
-0123   00C0 00 00 00 00 
-0123   00C4 00 00 00 00 
-0123   00C8 00 00 00 00 
-0123   00CC 00 00 00 00 
-0123   00D0 00 00 00 00 
-0123   00D4 00 00 00 00 
-0123   00D8 00 00 00 00 
-0123   00DC 00 00 00 00 
-0123   00E0 00 00 00 00 
-0123   00E4 00 00 00 00 
-0123   00E8 00 00 00 00 
-0123   00EC 00 00 00 00 
-0123   00F0 00 00 00 00 
-0123   00F4 00 00 00 00 
-0123   00F8 00 00 00 00 
-0123   00FC 00 00 00 00 
-0123   0100 00 00 00 00 
-0123   0104 00 00 00 00 
-0123   0108 00 00 00 00 
-0123   010C 00 00 00 00 
-0123   0110 00 00 00 00 
-0123   0114 00 00 00 00 
-0123   0118 00 00 00 00 
-0123   011C 00 00 00 00 
-0123   0120 00 00 00 00 
-0123   0124 00 00 00 00 
-0123   0128 00 00 00 00 
-0123   012C 00 00 00 00 
-0123   0130 00 00 00 00 
-0123   0134 00 00 00 00 
-0123   0138 00 00 00 00 
-0123   013C 00 00 00 00 
-0123   0140 00 00 00 00 
-0123   0144 00 00 00 00 
-0123   0148 00 00 00 00 
-0123   014C 00 00 00 00 
-0124   0150             
-0125   0150             .END
+   1:			;==================================================================================
+   2:			; Contents of this file are copyright Grant Searle
+   3:			;
+   4:			; You have permission to use this for NON COMMERCIAL USE ONLY
+   5:			; If you wish to use it elsewhere, please include an acknowledgement to myself.
+   6:			;
+   7:			; http://searle.hostei.com/grant/index.html
+   8:			;
+   9:			; eMail: home.micros01@btinternet.com
+  10:			;
+  11:			; If the above don't work, please perform an Internet search to see if I have
+  12:			; updated the web page hosting service.
+  13:			;
+  14:			;==================================================================================
+  15:			
+  16:	2000          	ramBegin        .EQU    02000H
+  17:	2002          	basicStarted    .EQU    ramBegin + 2
+  18:	20ED          	TEMPSTACK       .EQU    020EDH          ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+  19:			
+  20:			; Minimum 6850 ACIA polled serial I/O
+  21:			
+  22:	0001          	DATA6850        .EQU    01H             ; ACIA 6850 Data Register
+  23:	0002          	STAT6850        .EQU    02H             ; ACIA 6850 Status Register
+  24:			
+  25:			; Control character
+  26:			
+  27:	000D          	CR              .EQU    0DH
+  28:	000A          	LF              .EQU    0AH
+  29:	000C          	CS              .EQU    0CH             ; Clear screen
+  30:			
+  31:			;------------------------------------------------------------------------------
+  32:			; Reset - Here we go
+  33:			
+  34:	0000          	                .ORG    0000
+  35:			
+  36:	0000  F3      	RST00:          DI                      ;Disable interrupts
+  37:	0001  C32800  	                JP      INIT            ;Initialize Hardware and go
+  38:			
+  39:	0004 ..0007 00	                .DC     0008H-$,0       ; Padding so RST8 starts at org 0x0008H
+  40:			
+  41:			;------------------------------------------------------------------------------
+  42:			; TX a character over RS232
+  43:			
+  44:	0008          	                .ORG    0008H
+  45:	0008  D301    	RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
+  46:	000A  C9      	                RET
+  47:			
+  48:	000B ..000F 00	                .DC     0010H-$,0       ; Padding so RST10 starts at org 0x0010H
+  49:			
+  50:			;------------------------------------------------------------------------------
+  51:			; RX a character over RS232 Channel A [Console], hold here until char ready.
+  52:			
+  53:	0010          	                .ORG    0010H
+  54:	0010  DF      	RST10:          RST     $18
+  55:	0011  28FD    	                JR      Z,RST10
+  56:	0013  DB01    	                IN      A,(DATA6850)     ; 6850 Receive Data Register
+  57:	0015  C9      	                RET
+  58:			
+  59:	0016 ..0017 00	                .DC     0018H-$,0
+  60:			
+  61:			;------------------------------------------------------------------------------
+  62:			; Check serial status
+  63:			
+  64:	0018          	                .ORG    0018H
+  65:	0018  DB02    	RST18:          IN      A,(STAT6850)    ; 6850 Status Register
+  66:	001A  B7      	                OR      A               ; 6850 Receive Data Register Full
+  67:	001B  C9      	                RET
+  68:			
+  69:	001C ..001F 00	                .DC     0020H-$,0
+  70:			
+  71:			;------------------------------------------------------------------------------
+  72:			; Output string
+  73:	0020          	                .ORG 0020H
+  74:	0020  7E      	PRINT:          LD      A,(HL)          ; Get character
+  75:	0021  B7      	                OR      A               ; Is it $00 ?
+  76:	0022  C8      	                RET     Z               ; Then RETurn on terminator
+  77:	0023  CF      	                RST     08H             ; Print it
+  78:	0024  23      	                INC     HL              ; Next Character
+  79:	0025  18F9    	                JR      PRINT           ; Continue until $00
+  80:	0027  C9      	                RET
+  81:			
+  82:			;------------------------------------------------------------------------------
+  83:			
+  84:	0028          	INIT:
+  85:	0028  21ED20  	                LD      HL,TEMPSTACK    ; Temp stack
+  86:	002B  F9      	                LD      SP,HL           ; Set up a temporary stack
+  87:			
+  88:	002C  216300  	                LD      HL,SIGNON1      ; Sign-on message
+  89:	002F  CD2000  	                CALL    PRINT           ; Output string
+  90:	0032  3A0220  	                LD      A,(basicStarted); Check the BASIC STARTED flag
+  91:	0035  FE59    	                CP      'Y'             ; to see if this is power-up
+  92:	0037  2014    	                JR      NZ,COLDSTART    ; If not BASIC started then always do cold start
+  93:	0039  217E00  	                LD      HL,SIGNON2      ; Cold/warm message
+  94:	003C  CD2000  	                CALL    PRINT           ; Output string
+  95:	003F          	CORW:
+  96:	003F  D7      	                RST     10H
+  97:	0040  E6DF    	                AND     11011111B       ; lower to uppercase
+  98:	0042  FE43    	                CP      'C'
+  99:	0044  200F    	                JR      NZ, CHECKWARM
+ 100:	0046  CF      	                RST     08H
+ 101:	0047  3E0D    	                LD      A,0DH
+ 102:	0049  CF      	                RST     08H
+ 103:	004A  3E0A    	                LD      A,0AH
+ 104:	004C  CF      	                RST     08H
+ 105:	004D  3E59    	COLDSTART:      LD      A,'Y'           ; Set the BASIC STARTED flag
+ 106:	004F  320220  	                LD      (basicStarted),A
+ 107:	0052  C35001  	                JP      0150H           ; Start BASIC COLD
+ 108:	0055          	CHECKWARM:
+ 109:	0055  FE57    	                CP      'W'
+ 110:	0057  20E6    	                JR      NZ, CORW
+ 111:	0059  CF      	                RST     08H
+ 112:	005A  3E0D    	                LD      A,0DH
+ 113:	005C  CF      	                RST     08H
+ 114:	005D  3E0A    	                LD      A,0AH
+ 115:	005F  CF      	                RST     08H
+ 116:	0060  C35301  	                JP      0153H           ; Start BASIC WARM
+ 117:			
+ 118:	0063  0C      	SIGNON1:        .DB     CS
+ 119:	0064  5A383020	                .DB     "Z80 SBC By Grant Searle",CR,LF,0
+	      53424320
+	      42792047
+	      72616E74
+	      20536561
+	      726C650D
+	      0A00
+ 120:	007E  0D0A    	SIGNON2:        .DB     CR,LF
+ 121:	0080  2843296F	                .DB     "(C)old or (W)arm start?",0
+	      6C64206F
+	      72202857
+	      2961726D
+	      20737461
+	      72743F00
+ 122:			
+ 123:	0098 ..014F 00	                .DC     (00150H - $), 0
+ 124:			
+ 125:	0150          	.END
+
+
+
+Statistics:
+
+     4	passes
+     0	jr promotions
+    19	symbols
+   336	bytes
+
+
+
+Symbol Table:
+
+CHECKWARM       55        85
+COLDSTART       4D        77
+CORW            3F        63
+CR             =0D        13
+CS             =0C        12
+DATA6850       =01        1
+INIT            28        40
+LF             =0A        10
+PRINT           20        32
+RST00           00        0
+RST08           08        8
+RST10           10        16
+RST18           18        24
+SIGNON1         63        99
+SIGNON2         7E        126
+STAT6850       =02        2
+TEMPSTACK      =20ED      8429
+basicStarted   =2002      8194
+ramBegin       =2000      8192

@@ -37,6 +37,7 @@ DEL     .EQU   7FH             ; Delete
 
 ; BASIC WORK SPACE LOCATIONS
 
+RAMSTART .EQU  2000H           ; Start of RAM
 WRKSPC  .EQU   2045H           ; BASIC Work space
 USR     .EQU   WRKSPC + 3H     ; "USR (x)" jump
 OUTSUB  .EQU   WRKSPC + 6H     ; "OUT p,n"
@@ -123,7 +124,7 @@ ST      .EQU   1EH             ; String formula too complex
 CN      .EQU   20H             ; Can't CONTinue
 UF      .EQU   22H             ; UnDEFined FN function
 MO      .EQU   24H             ; Missing operand
-HX      .EQU   26H             ; HEX error
+HE      .EQU   26H             ; HEX error
 BN      .EQU   28H             ; BIN error
 
         .ORG   00150H
@@ -156,8 +157,12 @@ COPY:   LD      A,(DE)          ; Get source
         CALL    PRNTCRLF        ; Output CRLF
         LD      (BUFFER+72+1),A ; Mark end of buffer
         LD      (PROGST),A      ; Initialise program area
-MSIZE:  LD      HL,MEMMSG       ; Point to message
-        CALL    PRS             ; Output "Memory size"
+
+;MSIZE: LD      HL,MEMMSG       ; Point to message
+;       CALL    PRS             ; Output "Memory size"
+MSIZE:  LD      HL,(RAMSTART)   ; Read RAM end from memory
+        JP      SETTOP          ; Skip user input and mem check
+
         CALL    PROMPT          ; Get input with '?'
         CALL    GETCHR          ; Get next character
         OR      A               ; Set flags
@@ -4237,7 +4242,7 @@ HEXIT   EX      DE,HL           ; Value into DE, Code string into HL
         POP     HL
         RET
 
-HXERR:  LD      E,HX            ; ?HEX Error
+HXERR:  LD      E,HE            ; ?HEX Error
         JP      ERROR
 
 ; BIN$(NN) Convert integer to a 1-16 char binary string
@@ -4308,16 +4313,14 @@ BINERR: LD      E,BN            ; ?BIN Error
         JP      ERROR
 
 
-JJUMP1:
-        LD      IX,-1           ; Flag cold start
+JJUMP1: LD      IX,-1           ; Flag cold start
         JP      CSTART          ; Go and initialise
 
-MONOUT:
-        JP      0008H           ; output a char
+MONOUT: JP      0008H           ; output a char
 
 
-MONITR:
-        JP      0000H           ; Restart (Normally Monitor Start)
+MONITR: HALT
+        ;JP      0000H           ; Restart (Normally Monitor Start)
 
 
 INITST: LD      A,0             ; Clear break flag
