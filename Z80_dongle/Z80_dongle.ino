@@ -14,7 +14,7 @@
 // to sense when Z80 tri-states those two buses.
 //
 // Notes:
-//      - Use serial set to 1000000
+//      - Use serial set to 115200
 //      - In the Arduino serial monitor window, set line ending to "CR"
 //      - Memory access is simulated using a 4096-byte pseudo-RAM memory
 //      - I/O map is implemented with a buffer of 256 byte.
@@ -148,11 +148,11 @@ byte iorqVector;         // Push IORQ vector (default is FF)
 uint16_t pauseAddress;   // Pause at M1
 
 // Buffer containing RAM memory for Z80 to access
-const uint16_t ramLen = 0x1000;
+const uint16_t ramLen = 0x1000; // 4 K
 // more RAM for Basic program
 // reuse as additional space for input and extra, tmp, ftmp
-uint8_t RAM[ ramLen + 2560 ];
-const uint16_t ramMask = 0xFFF;
+uint8_t RAM[ ramLen + 0xA00 ]; // 6.5 K
+const uint16_t ramMask = 0x0FFF;
 
 static uint16_t ramBegin = 0;
 static uint8_t ramBeginHi = 0;
@@ -172,14 +172,14 @@ uint8_t const *ROM = rom_gs;
  *                    ftIiiii
  * End of RAM is used in parallel by other buffer
  *  RAM   26 blocks: |RRRRRRRRRRRRRRRRRRRRRRRRRR|
- *  ftmp   1 block:  |                   #      |
- *  tmp    1 block:  |                    #     |
- *  IO     1 block:  |                     #    |
- *  input  4 blocks: |                      ####|
+ *  ftmp   1 block:  |                      #   |
+ *  tmp    1 block:  |                       #  |
+ *  IO     1 block:  |                        # |
+ *  input  1 block:  |                         #|
  *
  */
 // Temp buffer to store input line at the end of Basic RAM, unused at analyser
-static const int INPUT_SIZE = 1024; // enough room for ~400 byte intel hex code input
+static const int INPUT_SIZE = 256;
 char *input = (char *)RAM + sizeof( RAM ) - INPUT_SIZE;
 
 // Temp buffer for extra dump info, at the end of input buffer (unused during output)
@@ -347,7 +347,7 @@ void GetDataFromDB() {
 
 
 // Read a value of Z80 address bus (PC:PA) and store it into the ab variable.
-// In addition, try to detect when a bus is tri-stated and write 0xFFF if so.
+// In addition, try to detect when a bus is tri-stated and write 0xFFFF if so.
 void GetAddressFromAB() {
     // Detect if the address bus is tri-stated
     int sense = analogRead( AB0_sense );
@@ -1033,11 +1033,22 @@ int readBytesUntilEOL( char *buf, int maxlen ) {
             continue;
         if ( c == '\r' || c == '\n' )
             break;
-        *buf++ = c;
-        --maxlen;
-        ++n;
-        if ( doEcho )
-            Serial.write( c );
+        if ( c != 0x08 && c != 0x7F ) { // BS or DEL
+            if ( doEcho )
+                Serial.write( c );
+            *buf++ = c;
+            --maxlen;
+            ++n;
+        } else if ( n ) {
+            *--buf = 0;
+            ++maxlen;
+            --n;
+            if ( doEcho ) {
+                Serial.write( 0x08 );
+                Serial.write( ' ' );
+                Serial.write( 0x08 );
+            }
+        }
     }
     if ( doEcho )
         Serial.write( "\r\n" );
