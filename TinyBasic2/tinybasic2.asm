@@ -101,7 +101,7 @@ TSTC            MACRO   CHAR,LABEL
                 .ORG    ROMBGN
 
 CSTART:         LD      SP,STACK ;*** COLD START ***
-                LD      A,$C9   ;"RET", also not an ASCII char
+                LD      A,0     ;must be 2 byte
                 JP      INIT    ;as delimiter for PRTSTG
 
                 ;*** RST 1 @ $0008 ***
@@ -366,12 +366,19 @@ CI0:            CP      03H     ;IS IT CONTROL-C?
 ;
 ;THIS IS AT LOC. 0
 ;CSTART:        LD      SP,STACK    ;*** COLD START ***
-;               LD      A,$C9       ;"RET", also != ASCII char
-;               JP      INIT        ;for PRTSTG
+;               XOR     A           ;
+;               JP      INIT        ;
 ;
-INIT:           LD      (USRSPC),A  ;"RET" AT USR CODE SPACE
+INIT:
+                LD      HL,RAMBGN   ;SOURCE
+                LD      (HL),A      ;CLEAR MEM
+                LD      DE,RAMBGN+1 ;DESTINATION
+                LD      BC,RAMSZE-1 ;BYTE COUNT
+                LDIR                ;CLR COMPLETE MEMORY
                 LD      DE,TIBAS    ;COLD START MESSAGE
                 CALL    PRTSTG
+                LD      A,$C9
+                LD      (USRSPC),A  ;"RET" AT USR CODE SPACE
                 LD      HL,CSTART   ;INIT RANDOM POINTER
                 LD      (RANPNT),HL
                 LD      HL,TXTBGN   ;UNFILLED TEXT
