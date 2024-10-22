@@ -32,6 +32,7 @@ CTRLQ	.EQU   11H	       ; Control "Q"
 CTRLR   .EQU   12H             ; Control "R"
 CTRLS   .EQU   13H             ; Control "S"
 CTRLU   .EQU   15H             ; Control "U"
+CAN     .EQU   18H             ; Cancel Control 'X'
 ESC     .EQU   1BH             ; Escape
 DEL     .EQU   7FH             ; Delete
 
@@ -951,9 +952,9 @@ PROCES: LD      A,C             ; Get character
         JP      Z,ENDINP        ; Yes - Terminate input
         CP      CTRLU           ; Is it control "U"?
         JP      Z,KILIN         ; Yes - Get another line
-        CP      '@'             ; Is it "kill line"?
+        CP      CAN             ; Is it "kill line"?
         JP      Z,OTKLN         ; Yes - Kill line
-        CP      '_'             ; Is it delete?
+        CP      DEL             ; Is it delete?
         JP      Z,DELCHR        ; Yes - Delete character
         CP      BKSP            ; Is it backspace?
         JP      Z,DELCHR        ; Yes - Delete character
