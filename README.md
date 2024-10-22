@@ -926,9 +926,9 @@ OK
 This little code line uses my HW extensions to hex-dump the content of the program memory.
 
 ```
->10 for a=ram to top-size-1; print #4,%16,get(a),; next a
+>10 for a=txt to top-size-1; print #4,%16,get(a),; next a
 >run
-   $A  $0 $66 $6F $72 $20 $61 $3D $72 $61 $6D $20 $74 $6F $20 $74
+   $A  $0 $66 $6F $72 $20 $61 $3D $74 $78 $74 $20 $74 $6F $20 $74
   $6F $70 $2D $73 $69 $7A $65 $2D $31 $3B $20 $70 $72 $69 $6E $74
   $20 $23 $34 $2C $25 $31 $36 $2C $67 $65 $74 $28 $61 $29 $2C $3B
   $20 $6E $65 $78 $74 $20 $61  $D
@@ -936,18 +936,19 @@ OK
 ```
 
 Each line starts with the line number stored as int16_t followed by the unchanged ASCII text finished with CR.
-To save space commands can be abbreviated with a full stop:
+To save space commands can be abbreviated with a full stop (and become almost unreadable).
 
 ```
->10 f.a=ram to top-s.-1;p.#4,%16,g.(a),;n.a
+>10 f.a=t.t.top-s.-1;p.#4,%16,g.(a),;n.a
 >run
-   $A  $0 $66 $2E $61 $3D $72 $61 $6D $20 $74 $6F $20 $74 $6F $70
-  $2D $73 $2E $2D $31 $3B $70 $2E $23 $34 $2C $25 $31 $36 $2C $67
-  $2E $28 $61 $29 $2C $3B $6E $2E $61  $D
+   $A  $0 $66 $2E $61 $3D $74 $2E $74 $2E $74 $6F $70 $2D $73 $2E
+  $2D $31 $3B $70 $2E $23 $34 $2C $25 $31 $36 $2C $67 $2E $28 $61
+  $29 $2C $3B $6E $2E $61  $D
 OK
 ```
 
-Depending on the context `g.` could either be the command `goto` or the function `get`.
+Depending on the context `t.` could either be the constant `txt` or the statement `to`,
+same for `get()` and `goto`.
 
 This part puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it via the funtion `USR(123)`.
 

@@ -1,0 +1,58 @@
+        IN B,(C)                ; ED 40
+        OUT (C),B               ; ED 41
+        SBC HL,BC               ; ED 42
+        LD (NNNN),BC            ; ED 43 34 12
+        NEG                     ; ED 44
+        RETN                    ; ED 45
+        IM 0                    ; ED 46
+        LD I,A                  ; ED 47
+        IN C,(C)                ; ED 48
+        OUT (C),C               ; ED 49
+        ADC HL,BC               ; ED 4A
+        LD BC,(NNNN)            ; ED 4B 34 12
+        RETI                    ; ED 4D
+        LD R,A                  ; ED 4F
+        IN D,(C)                ; ED 50
+        OUT (C),D               ; ED 51
+        SBC HL,DE               ; ED 52
+        LD (NNNN),DE            ; ED 53 34 12
+        IM 1                    ; ED 56
+        LD A,I                  ; ED 57
+        IN E,(C)                ; ED 58
+        OUT (C),E               ; ED 59
+        ADC HL,DE               ; ED 5A
+        LD DE,(NNNN)            ; ED 5B 34 12
+        IM 2                    ; ED 5E
+        LD A,R                  ; ED 5F
+        IN H,(C)                ; ED 60
+        OUT (C),H               ; ED 61
+        SBC HL,HL               ; ED 62
+        RRD                     ; ED 67
+        IN L,(C)                ; ED 68
+        OUT (C),L               ; ED 69
+        ADC HL,HL               ; ED 6A
+        RLD                     ; ED 6F
+        IN (C)                  ; ED 70
+        OUT (C),0               ; ED 71
+        SBC HL,SP               ; ED 72
+        LD (NNNN),SP            ; ED 73 34 12
+        IN A,(C)                ; ED 78
+        OUT (C),A               ; ED 79
+        ADC HL,SP               ; ED 7A
+        LD SP,(NNNN)            ; ED 7B 34 12
+        LDI                     ; ED A0
+        CPI                     ; ED A1
+        INI                     ; ED A2
+        OUTI                    ; ED A3
+        LDD                     ; ED A8
+        CPD                     ; ED A9
+        IND                     ; ED AA
+        OUTD                    ; ED AB
+        LDIR                    ; ED B0
+        CPIR                    ; ED B1
+        INIR                    ; ED B2
+        OTIR                    ; ED B3
+        LDDR                    ; ED B8
+        CPDR                    ; ED B9
+        INDR                    ; ED BA
+        OTDR                    ; ED BB

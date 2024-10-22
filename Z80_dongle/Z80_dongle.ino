@@ -45,7 +45,7 @@
 //  Li Chen Wang's Tiny Basic ROM
 #include "TinyBasic2.h"
 
-#include "opcode.h"
+#include "opcodes.h"
 
 const uint32_t BAUDRATE = 115200;
 
@@ -271,8 +271,24 @@ void ResetSimulationVars() {
 }
 
 
+static bool CB = false;
+static bool DD = false;
+static bool ED = false;
+static bool FD = false;
+
+static bool isPrefix( uint8_t data ) { return data == 0xCB || data == 0xDD || data == 0xED || data == 0xFD; }
+
+static bool isCB() { return CB; }
+static bool isDD() { return DD; }
+static bool isDDCB() { return DD && CB; }
+static bool isED() { return ED; }
+static bool isFD() { return FD; }
+static bool isFDCB() { return FD && CB; }
+
+
 // Issue a RESET sequence to Z80 and reset internal counters
 void DoReset() {
+    CB = DD = ED = FD = false; // reset prefixes
     pf( F( "\r\n:Starting the clock\r\n" ) );
     digitalWrite( RESET, LOW );
     delayMicroseconds( 4 );
@@ -377,20 +393,6 @@ void DumpState( bool suppress ) {
     extraInfo[ 0 ] = 0;
 }
 
-static bool CB = false;
-static bool DD = false;
-static bool ED = false;
-static bool FD = false;
-
-static bool isPrefix( uint8_t data ) { return data == 0xCB || data == 0xDD || data == 0xED || data == 0xFD; }
-
-static bool isCB() { return CB; }
-static bool isDD() { return DD; }
-static bool isDDCB() { return DD && CB; }
-static bool isED() { return ED; }
-static bool isFD() { return FD; }
-static bool isFDCB() { return FD && CB; }
-
 //--------------------------------------------------------
 // Trace/simulation control handler
 //--------------------------------------------------------
@@ -467,27 +469,28 @@ int controlHandler() {
             }
 
             if ( cmd == 'A' ) { // analyse
-                // signal 4K memory size to Basic
                 ramEnd = ramBegin + ramLen - 1;
-                RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
-                RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
+                if ( opt != 'T' ) { // 8 K BASIC
+                    // signal 4K memory size to Basic
+                    RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
+                    RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
+                }
                 singleStep = running = true;
             } else { // run Basic
                 memset( RAM, 0, sizeof( RAM ) );
                 ramEnd = ramBegin + sizeof( RAM ) - 1;
-                // signal memory size to Basic
-                RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
-                RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
-                if ( opt == 'T' )                              // Tiny Basic
-                    runWithInterrupt( 0x800, sizeof( RAM ) );  // returns after 'HALT' cmd
-                else                                           // default, Grants version
+                if ( opt != 'T' ) { // 8 K BASIC
+                    // signal memory size to Basic
+                    RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
+                    RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
                     runWithInterrupt( 0x2000, sizeof( RAM ) ); // returns after 'MONITOR' cmd
-                while ( Serial.available() )                   // clear buffer
-                    Serial.read();
+                } else                                         // Tiny BASIC
+                    runWithInterrupt( 0x800, sizeof( RAM ) );  // returns after 'HALT' cmd
+                while ( Serial.available() )
+                    Serial.read(); // clear buffer
                 pf( F( "BASIC halted\r\n" ) );
-                break; // go to analyser loop
             }
-            DoReset();
+            // DoReset();
             break;
 
         case 'X': // execute program from RAM
@@ -805,26 +808,21 @@ void loop() {
             if ( !m1 ) {
                 const char *opc;
                 m1Address = ab;
-                sprintf( extraInfo, "Opcode read from %s %04X -> %02X  ",
-                    ab < ramBegin ? "ROM" : "RAM", ab, data
-                );
+                sprintf( extraInfo, "Opcode read from %s %04X -> %02X  ", ab < ramBegin ? "ROM" : "RAM", ab, data );
                 if ( data == 0xCB ) {
                     CB = true;
                     ED = false;
-                }
-                else if ( data == 0xDD ) {
+                } else if ( data == 0xDD ) {
                     CB = false;
                     DD = true;
                     ED = false;
                     FD = false;
-                }
-                else if ( data == 0xED ) {
+                } else if ( data == 0xED ) {
                     CB = false;
                     DD = false;
                     ED = true;
                     FD = false;
-                }
-                else if ( data == 0xFD ) {
+                } else if ( data == 0xFD ) {
                     CB = false;
                     ED = false;
                     DD = false;
@@ -833,20 +831,20 @@ void loop() {
                 if ( isPrefix( data ) )
                     opc = opcode[ data ];
                 else if ( isDDCB() )
-                    opc = prefixDDCB[ data ];
+                    opc = opcodeDDCB[ data ];
                 else if ( isFDCB() )
-                    opc = prefixFDCB[ data ];
+                    opc = opcodeFDCB[ data ];
                 else if ( isCB() )
-                    opc = prefixCB[ data ];
+                    opc = opcodeCB[ data ];
                 else if ( isDD() )
-                    opc = prefixDD[ data ];
+                    opc = opcodeDD[ data ];
                 else if ( isED() )
-                    opc = prefixED[ data ];
+                    opc = opcodeED[ data ];
                 else if ( isFD() )
-                    opc = prefixFD[ data ];
+                    opc = opcodeFD[ data ];
                 else
                     opc = opcode[ data ];
-                strlcpy_P( extraInfo+strlen( extraInfo ), (PROGMEM const char*)opc, 16 );
+                strlcpy_P( extraInfo + strlen( extraInfo ), (PROGMEM const char *)opc, 16 );
                 if ( !isPrefix( data ) ) // clear all prefixes
                     CB = DD = ED = FD = false;
             } else {
@@ -892,9 +890,9 @@ void loop() {
             GetDataFromDB();
             IO[ ab & ioMask ] = db;
             sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) )
-              || ( analyseBasic == 't' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) )
-              || ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
+            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
+                 ( analyseBasic == 't' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ||
+                 ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
                 sprintf( extraInfo + strlen( extraInfo ), "  CONOUT: %c", isprint( db ) ? db : ' ' );
         }
 
@@ -919,13 +917,14 @@ void loop() {
     if ( singleStep || ( tracePause > 0 && tracePause == tracePauseCount ) || ( pauseAddress && pauseAddress == m1Address ) ) {
         singleStep = false;
         while ( Serial.available() == 0 )
-            ;                            // wait
-        if ( Serial.peek() == ' ' ) {    // step
-            while ( Serial.available() ) // remove CR if buffered terminal
-                Serial.read();
-            singleStep = true;
-        } else if ( Serial.peek() == '\r' ) { // run
+            ;                          // wait
+        if ( Serial.peek() == '\r' ) { // step
             Serial.read();
+            singleStep = true;
+        } else if ( Serial.peek() == ' ' ) { // run
+            Serial.read();                   // consume SPACE
+            while ( Serial.peek() == '\r' )  // remove CR if buffered terminal
+                Serial.read();
         } else { // command char
             running = false;
             singleStep = controlHandler();
@@ -1173,6 +1172,10 @@ void runWithInterrupt( uint16_t romLen, uint16_t ramLen ) {
     while ( true ) { // background tasks can be done here
         ;            // the Z80 interrupts this loop
         if ( 0 == digitalRead( HALT ) ) {
+            EIMSK &= ~( ( 1 << RD_PIN ) + ( 1 << WR_PIN ) ); // DI ext INT
+            TCCR2A = 0;                                      // stop CLK
+            TCCR2B = 0;
+            digitalWrite( CLK, LOW );
             return;
         }
     }
@@ -1207,7 +1210,7 @@ inline void DATA_PUT( uint8_t d ) {
 
 ISR( INT2_vect ) { // Handle RD
     WAIT_LOW();
-    if ( zMREQ ) { // Handle MREQ
+    if ( zMREQ ) {                     // Handle MREQ
         if ( ADDR_HI >= ramBeginHi ) { // RAM read
             if ( ADDR_HI <= ramEndHi ) {
                 DATA_PUT( RAM[ (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) - ramBegin ] );

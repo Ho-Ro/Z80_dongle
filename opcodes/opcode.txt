@@ -1,0 +1,256 @@
+        NOP                     ; 00
+        LD BC,NNNN              ; 01 34 12
+        LD (BC),A               ; 02
+        INC BC                  ; 03
+        INC B                   ; 04
+        DEC B                   ; 05
+        LD B,NN                 ; 06 56
+        RLCA                    ; 07
+        EX AF,AF'               ; 08
+        ADD HL,BC               ; 09
+        LD A,(BC)               ; 0A
+        DEC BC                  ; 0B
+        INC C                   ; 0C
+        DEC C                   ; 0D
+        LD C,NN                 ; 0E 56
+        RRCA                    ; 0F
+        DJNZ NN                 ; 10 00
+        LD DE,NNNN              ; 11 34 12
+        LD (DE),A               ; 12
+        INC DE                  ; 13
+        INC D                   ; 14
+        DEC D                   ; 15
+        LD D,NN                 ; 16 56
+        RLA                     ; 17
+        JR NN                   ; 18 00
+        ADD HL,DE               ; 19
+        LD A,(DE)               ; 1A
+        DEC DE                  ; 1B
+        INC E                   ; 1C
+        DEC E                   ; 1D
+        LD E,NN                 ; 1E 56
+        RRA                     ; 1F
+        JR NZ,NN                ; 20 00
+        LD HL,NNNN              ; 21 34 12
+        LD (NNNN),HL            ; 22 34 12
+        INC HL                  ; 23
+        INC H                   ; 24
+        DEC H                   ; 25
+        LD H,NN                 ; 26 56
+        DAA                     ; 27
+        JR Z,NN                 ; 28 00
+        ADD HL,HL               ; 29
+        LD HL,(NNNN)            ; 2A 34 12
+        DEC HL                  ; 2B
+        INC L                   ; 2C
+        DEC L                   ; 2D
+        LD L,NN                 ; 2E 56
+        CPL                     ; 2F
+        JR NC,NN                ; 30 00
+        LD SP,NNNN              ; 31 34 12
+        LD (NNNN),A             ; 32 34 12
+        INC SP                  ; 33
+        INC (HL)                ; 34
+        DEC (HL)                ; 35
+        LD (HL),NN              ; 36 56
+        SCF                     ; 37
+        JR C,NN                 ; 38 00
+        ADD HL,SP               ; 39
+        LD A,(NNNN)             ; 3A 34 12
+        DEC SP                  ; 3B
+        INC A                   ; 3C
+        DEC A                   ; 3D
+        LD A,NN                 ; 3E 56
+        CCF                     ; 3F
+        LD B,B                  ; 40
+        LD B,C                  ; 41
+        LD B,D                  ; 42
+        LD B,E                  ; 43
+        LD B,H                  ; 44
+        LD B,L                  ; 45
+        LD B,(HL)               ; 46
+        LD B,A                  ; 47
+        LD C,B                  ; 48
+        LD C,C                  ; 49
+        LD C,D                  ; 4A
+        LD C,E                  ; 4B
+        LD C,H                  ; 4C
+        LD C,L                  ; 4D
+        LD C,(HL)               ; 4E
+        LD C,A                  ; 4F
+        LD D,B                  ; 50
+        LD D,C                  ; 51
+        LD D,D                  ; 52
+        LD D,E                  ; 53
+        LD D,H                  ; 54
+        LD D,L                  ; 55
+        LD D,(HL)               ; 56
+        LD D,A                  ; 57
+        LD E,B                  ; 58
+        LD E,C                  ; 59
+        LD E,D                  ; 5A
+        LD E,E                  ; 5B
+        LD E,H                  ; 5C
+        LD E,L                  ; 5D
+        LD E,(HL)               ; 5E
+        LD E,A                  ; 5F
+        LD H,B                  ; 60
+        LD H,C                  ; 61
+        LD H,D                  ; 62
+        LD H,E                  ; 63
+        LD H,H                  ; 64
+        LD H,L                  ; 65
+        LD H,(HL)               ; 66
+        LD H,A                  ; 67
+        LD L,B                  ; 68
+        LD L,C                  ; 69
+        LD L,D                  ; 6A
+        LD L,E                  ; 6B
+        LD L,H                  ; 6C
+        LD L,L                  ; 6D
+        LD L,(HL)               ; 6E
+        LD L,A                  ; 6F
+        LD (HL),B               ; 70
+        LD (HL),C               ; 71
+        LD (HL),D               ; 72
+        LD (HL),E               ; 73
+        LD (HL),H               ; 74
+        LD (HL),L               ; 75
+        HALT                    ; 76
+        LD (HL),A               ; 77
+        LD A,B                  ; 78
+        LD A,C                  ; 79
+        LD A,D                  ; 7A
+        LD A,E                  ; 7B
+        LD A,H                  ; 7C
+        LD A,L                  ; 7D
+        LD A,(HL)               ; 7E
+        LD A,A                  ; 7F
+        ADD A,B                 ; 80
+        ADD A,C                 ; 81
+        ADD A,D                 ; 82
+        ADD A,E                 ; 83
+        ADD A,H                 ; 84
+        ADD A,L                 ; 85
+        ADD A,(HL)              ; 86
+        ADD A,A                 ; 87
+        ADC A,B                 ; 88
+        ADC A,C                 ; 89
+        ADC A,D                 ; 8A
+        ADC A,E                 ; 8B
+        ADC A,H                 ; 8C
+        ADC A,L                 ; 8D
+        ADC A,(HL)              ; 8E
+        ADC A,A                 ; 8F
+        SUB B                   ; 90
+        SUB C                   ; 91
+        SUB D                   ; 92
+        SUB E                   ; 93
+        SUB H                   ; 94
+        SUB L                   ; 95
+        SUB (HL)                ; 96
+        SUB A                   ; 97
+        SBC B                   ; 98
+        SBC C                   ; 99
+        SBC D                   ; 9A
+        SBC E                   ; 9B
+        SBC H                   ; 9C
+        SBC L                   ; 9D
+        SBC (HL)                ; 9E
+        SBC A                   ; 9F
+        AND B                   ; A0
+        AND C                   ; A1
+        AND D                   ; A2
+        AND E                   ; A3
+        AND H                   ; A4
+        AND L                   ; A5
+        AND (HL)                ; A6
+        AND A                   ; A7
+        XOR B                   ; A8
+        XOR C                   ; A9
+        XOR D                   ; AA
+        XOR E                   ; AB
+        XOR H                   ; AC
+        XOR L                   ; AD
+        XOR (HL)                ; AE
+        XOR A                   ; AF
+        OR B                    ; B0
+        OR C                    ; B1
+        OR D                    ; B2
+        OR E                    ; B3
+        OR H                    ; B4
+        OR L                    ; B5
+        OR (HL)                 ; B6
+        OR A                    ; B7
+        CP B                    ; B8
+        CP C                    ; B9
+        CP D                    ; BA
+        CP E                    ; BB
+        CP H                    ; BC
+        CP L                    ; BD
+        CP (HL)                 ; BE
+        CP A                    ; BF
+        RET NZ                  ; C0
+        POP BC                  ; C1
+        JP NZ,NNNN              ; C2 34 12
+        JP NNNN                 ; C3 34 12
+        CALL NZ,NNNN            ; C4 34 12
+        PUSH BC                 ; C5
+        ADD A,NN                ; C6 56
+        RST 0                   ; C7
+        RET Z                   ; C8
+        RET                     ; C9
+        JP Z,NNNN               ; CA 34 12
+        PREFIX CB               ; CB
+        CALL Z,NNNN             ; CC 34 12
+        CALL NNNN               ; CD 34 12
+        ADC A,NN                ; CE 56
+        RST 8H                  ; CF
+        RET NC                  ; D0
+        POP DE                  ; D1
+        JP NC,NNNN              ; D2 34 12
+        OUT (NN),A              ; D3 56
+        CALL NC,NNNN            ; D4 34 12
+        PUSH DE                 ; D5
+        SUB NN                  ; D6 56
+        RST 10H                 ; D7
+        RET C                   ; D8
+        EXX                     ; D9
+        JP C,NNNN               ; DA 34 12
+        IN A,(NN)               ; DB 56
+        CALL C,NNNN             ; DC 34 12
+        PREFIX DD               ; DD
+        SBC A,NN                ; DE 56
+        RST 18H                 ; DF
+        RET PO                  ; E0
+        POP HL                  ; E1
+        JP PO,NNNN              ; E2 34 12
+        EX (SP),HL              ; E3
+        CALL PO,NNNN            ; E4 34 12
+        PUSH HL                 ; E5
+        AND NN                  ; E6 56
+        RST 20H                 ; E7
+        RET PE                  ; E8
+        JP (HL)                 ; E9
+        JP PE,NNNN              ; EA 34 12
+        EX DE,HL                ; EB
+        CALL PE,NNNN            ; EC 34 12
+        PREFIX ED               ; ED
+        XOR NN                  ; EE 56
+        RST 28H                 ; EF
+        RET P                   ; F0
+        POP AF                  ; F1
+        JP P,NNNN               ; F2 34 12
+        DI                      ; F3
+        CALL P,NNNN             ; F4 34 12
+        PUSH AF                 ; F5
+        OR NN                   ; F6 56
+        RST 30H                 ; F7
+        RET M                   ; F8
+        LD SP,HL                ; F9
+        JP M,NNNN               ; FA 34 12
+        EI                      ; FB
+        CALL M,NNNN             ; FC 34 12
+        PREFIX FD               ; FD
+        CP NN                   ; FE 56
+        RST 38H                 ; FF

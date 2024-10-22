@@ -1,0 +1,75 @@
+        ADD IX,BC               ; DD 09
+        ADD IX,DE               ; DD 19
+        LD IX,NNNN              ; DD 21 34 12
+        LD (NNNN),IX            ; DD 22 34 12
+        INC IX                  ; DD 23
+        INC IXH                 ; DD 24
+        DEC IXH                 ; DD 25
+        LD  IXH,NN              ; DD 26 56
+        ADD IX,IX               ; DD 29
+        LD IX,(NNNN)            ; DD 2A 34 12
+        DEC IX                  ; DD 2B
+        INC IXL                 ; DD 2C
+        DEC IXL                 ; DD 2D
+        LD  IXL,NN              ; DD 2E 56
+        INC (IX+NN)             ; DD 34 56
+        DEC (IX+NN)             ; DD 35 56
+        LD (IX+NN),MM           ; DD 36 56 78
+        ADD IX,SP               ; DD 39
+        LD B,IXH                ; DD 44
+        LD B,IXL                ; DD 45
+        LD B,(IX+NN)            ; DD 46 56
+        LD C,IXH                ; DD 4C
+        LD C,IXL                ; DD 4D
+        LD C,(IX+NN)            ; DD 4E 56
+        LD D,IXH                ; DD 54
+        LD D,IXL                ; DD 55
+        LD D,(IX+NN)            ; DD 56 56
+        LD E,IXH                ; DD 5C
+        LD E,IXL                ; DD 5D
+        LD E,(IX+NN)            ; DD 5E 56
+        LD IXH,IXH              ; DD 64
+        LD IXH,IXL              ; DD 65
+        LD H,(IX+NN)            ; DD 66 56
+        LD IXL,IXH              ; DD 6C
+        LD IXL,IXL              ; DD 6D
+        LD L,(IX+NN)            ; DD 6E 56
+        LD (IX+NN),B            ; DD 70 56
+        LD (IX+NN),C            ; DD 71 56
+        LD (IX+NN),D            ; DD 72 56
+        LD (IX+NN),E            ; DD 73 56
+        LD (IX+NN),H            ; DD 74 56
+        LD (IX+NN),L            ; DD 75 56
+        LD (IX+NN),A            ; DD 77 56
+        LD A,IXH                ; DD 7C
+        LD A,IXL                ; DD 7D
+        LD A,(IX+NN)            ; DD 7E 56
+        ADD A,IXH               ; DD 84
+        ADD A,IXL               ; DD 85
+        ADD A,(IX+NN)           ; DD 86 56
+        ADC A,IXH               ; DD 8C
+        ADC A,IXL               ; DD 8D
+        ADC A,(IX+NN)           ; DD 8E 56
+        SUB IXH                 ; DD 94
+        SUB IXL                 ; DD 95
+        SUB (IX+NN)             ; DD 96 56
+        SBC A,IXH               ; DD 9C
+        SBC A,IXL               ; DD 9D
+        SBC A,(IX+NN)           ; DD 9E 56
+        AND IXH                 ; DD A4
+        AND IXL                 ; DD A5
+        AND (IX+NN)             ; DD A6 56
+        XOR IXH                 ; DD AC
+        XOR IXL                 ; DD AD
+        XOR (IX+NN)             ; DD AE 56
+        OR IXH                  ; DD B4
+        OR IXL                  ; DD B5
+        OR (IX+NN)              ; DD B6 56
+        CP IXH                  ; DD BC
+        CP IXL                  ; DD BD
+        CP (IX+NN)              ; DD BE 56
+        POP IX                  ; DD E1
+        EX (SP),IX              ; DD E3
+        PUSH IX                 ; DD E5
+        JP (IX)                 ; DD E9
+        LD SP,IX                ; DD F9

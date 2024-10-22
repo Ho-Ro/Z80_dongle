@@ -1,0 +1,75 @@
+        ADD IY,BC               ; FD 09
+        ADD IY,DE               ; FD 19
+        LD IY,NNNN              ; FD 21 34 12
+        LD (NNNN),IY            ; FD 22 34 12
+        INC IY                  ; FD 23
+        INC IYH                 ; FD 24
+        DEC IYH                 ; FD 25
+        LD  IYH,NN              ; FD 26 56
+        ADD IY,IY               ; FD 29
+        LD IY,(NNNN)            ; FD 2A 34 12
+        DEC IY                  ; FD 2B
+        INC IYL                 ; FD 2C
+        DEC IYL                 ; FD 2D
+        LD  IYL,NN              ; FD 2E 56
+        INC (IY+NN)             ; FD 34 56
+        DEC (IY+NN)             ; FD 35 56
+        LD (IY+NN),MM           ; FD 36 56 78
+        ADD IY,SP               ; FD 39
+        LD B,IYH                ; FD 44
+        LD B,IYL                ; FD 45
+        LD B,(IY+NN)            ; FD 46 56
+        LD C,IYH                ; FD 4C
+        LD C,IYL                ; FD 4D
+        LD C,(IY+NN)            ; FD 4E 56
+        LD D,IYH                ; FD 54
+        LD D,IYL                ; FD 55
+        LD D,(IY+NN)            ; FD 56 56
+        LD E,IYH                ; FD 5C
+        LD E,IYL                ; FD 5D
+        LD E,(IY+NN)            ; FD 5E 56
+        LD IYH,IYH              ; FD 64
+        LD IYH,IYL              ; FD 65
+        LD H,(IY+NN)            ; FD 66 56
+        LD IYL,IYH              ; FD 6C
+        LD IYL,IYL              ; FD 6D
+        LD L,(IY+NN)            ; FD 6E 56
+        LD (IY+NN),B            ; FD 70 56
+        LD (IY+NN),C            ; FD 71 56
+        LD (IY+NN),D            ; FD 72 56
+        LD (IY+NN),E            ; FD 73 56
+        LD (IY+NN),H            ; FD 74 56
+        LD (IY+NN),L            ; FD 75 56
+        LD (IY+NN),A            ; FD 77 56
+        LD A,IYH                ; FD 7C
+        LD A,IYL                ; FD 7D
+        LD A,(IY+NN)            ; FD 7E 56
+        ADD A,IYH               ; FD 84
+        ADD A,IYL               ; FD 85
+        ADD A,(IY+NN)           ; FD 86 56
+        ADC A,IYH               ; FD 8C
+        ADC A,IYL               ; FD 8D
+        ADC A,(IY+NN)           ; FD 8E 56
+        SUB IYH                 ; FD 94
+        SUB IYL                 ; FD 95
+        SUB (IY+NN)             ; FD 96 56
+        SBC A,IYH               ; FD 9C
+        SBC A,IYL               ; FD 9D
+        SBC A,(IY+NN)           ; FD 9E 56
+        AND IYH                 ; FD A4
+        AND IYL                 ; FD A5
+        AND (IY+NN)             ; FD A6 56
+        XOR IYH                 ; FD AC
+        XOR IYL                 ; FD AD
+        XOR (IY+NN)             ; FD AE 56
+        OR IYH                  ; FD B4
+        OR IYL                  ; FD B5
+        OR (IY+NN)              ; FD B6 56
+        CP IYH                  ; FD BC
+        CP IYL                  ; FD BD
+        CP (IY+NN)              ; FD BE 56
+        POP IY                  ; FD E1
+        EX (SP),IY              ; FD E3
+        PUSH IY                 ; FD E5
+        JP (IY)                 ; FD E9
+        LD SP,IY                ; FD F9
