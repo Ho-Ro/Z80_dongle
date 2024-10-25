@@ -94,44 +94,44 @@ const uint32_t BAUDRATE = 115200;
 #define HI_Z_HIGH 600 // Low "1" value; upper tri-state boundary
 
 // Control *output* pins of Z80, we read them into these variables
-int halt;
-int mreq;
-int iorq;
-int rfsh;
-int m1;
-int busak;
-int wr;
-int rd;
+static int halt;
+static int mreq;
+static int iorq;
+static int rfsh;
+static int m1;
+static int busak;
+static int wr;
+static int rd;
 
 // Control *input* pins of Z80, we write them into the dongle
-int zint = 1;
-int nmi = 1;
-int reset = 1;
-int busrq = 1;
-int wait = 1;
+static int zint = 1;
+static int nmi = 1;
+static int reset = 1;
+static int busrq = 1;
+static int wait = 1;
 
 // Content of address and data wires
-uint16_t ab;
-uint8_t db;
+static uint16_t ab;
+static uint8_t db;
 
 // Clock counter after reset
-int clkCount;
-int clkCountHi;
+static int clkCount;
+static int clkCountHi;
 
 // T-cycle counter
-int T;
-int m1Prev;
+static int T;
+static int m1Prev;
 
 // M1-cycle counter
-int m1Count;
+static int m1Count;
 
 // Detection if the address or data bus is tri-stated
-bool abTristated = false;
-bool dbTristated = false;
+static bool abTristated = false;
+static bool dbTristated = false;
 
 // Simulation control variables
 bool running = 0;        // Simulation is running or is stopped
-int traceShowBothPhases; // Show both phases of a clock cycle
+int traceAlsoLowPhase; // Show both phases of a clock cycle
 int traceRefresh;        // Trace refresh cycles
 int tracePause;          // Pause for a key press every so many clocks
 int tracePauseCount;     // Current clock count for tracePause
@@ -139,10 +139,15 @@ int stopAtClk;           // Stop the simulation after this many clocks
 int stopAtM1;            // Stop at a specific M1 cycle number
 int stopAtHalt;          // Stop when HALT signal gets active
 int intAtClk;            // Issue INT signal at that clock number
+int intOffAtClk;         // Reset INT signal at that clock number
 int nmiAtClk;            // Issue NMI signal at that clock number
+int nmiOffAtClk;         // Reset NMI signal at that clock number
 int busrqAtClk;          // Issue BUSRQ signal at that clock number
-int resetAtClk;          // Issue RESET signal at that clock number
+int busrqOffAtClk;       // Reset BUSRQ signal at that clock number
+int resetAtClk;          // Set RESET signal at that clock number
+int resetOffAtClk;       // Reset RESET signal at that clock number
 int waitAtClk;           // Issue WAIT signal at that clock number
+int waitOffAtClk;        // Reset WAIT signal at that clock number
 int clearAtClk;          // Clear all control signals at that clock number
 byte iorqVector;         // Push IORQ vector (default is FF)
 uint16_t pauseAddress;   // Pause at M1
@@ -151,7 +156,7 @@ uint16_t pauseAddress;   // Pause at M1
 const uint16_t ramLen = 0x1000; // 4 K
 // more RAM for Basic program
 // reuse as additional space for input and extra, tmp, ftmp
-uint8_t RAM[ ramLen + 0xA00 ]; // 6.5 K
+static uint8_t RAM[ ramLen + 0xA00 ]; // 6.5 K
 const uint16_t ramMask = 0x0FFF;
 
 static uint16_t ramBegin = 0;
@@ -180,26 +185,31 @@ uint8_t const *ROM = rom_gs;
  */
 // Temp buffer to store input line at the end of Basic RAM, unused at analyser
 static const int INPUT_SIZE = 256;
-char *input = (char *)RAM + sizeof( RAM ) - INPUT_SIZE;
+static char *input = (char *)RAM + sizeof( RAM ) - INPUT_SIZE;
 
 // Temp buffer for extra dump info, at the end of input buffer (unused during output)
 static const int EXTRA_SIZE = 64;
-char *extraInfo = (char *)RAM + sizeof( RAM ) - EXTRA_SIZE;
+static char *extraInfo = (char *)RAM + sizeof( RAM ) - EXTRA_SIZE;
 
 // Buffer simulating IO space for Z80 to access, at unused Basic RAM before input buffer
-const unsigned int ioLen = 0x100;
-uint8_t *IO = RAM + sizeof( RAM ) - INPUT_SIZE - ioLen;
-const unsigned int ioMask = 0xFF;
+static const unsigned int ioLen = 0x100;
+static uint8_t *IO = RAM + sizeof( RAM ) - INPUT_SIZE - ioLen;
+static const unsigned int ioMask = 0xFF;
 
-const unsigned int tmpLen = 256;
-const unsigned int ftmpLen = 256;
-char *tmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen;
-char *ftmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
+static const unsigned int tmpLen = 256;
+static const unsigned int ftmpLen = 256;
+static char *tmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen;
+static char *ftmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen - ftmpLen;
 
-int doEcho = 1;      // Echo received commands
-int verboseMode = 0; // Enable debugging output
+static int doEcho = 1;      // Echo received commands
+static int verboseMode = 0; // Enable debugging output
 
-uint8_t analyseBasic = 0;
+static uint8_t analyseBasic = 0;
+
+// default 6850 ACIA port addresses
+static int ioDataPort = 1;
+static int ioStatPort = 2;
+
 
 // -----------------------------------------------------------
 // Arduino initialization entry point
@@ -253,17 +263,22 @@ void setup() {
 
 // Resets all simulation variables to their defaults
 void ResetSimulationVars() {
-    traceShowBothPhases = 0; // Show both phases of a clock cycle
+    traceAlsoLowPhase = 0;   // Show both phases of a clock cycle
     traceRefresh = 1;        // Trace refresh cycles
     tracePause = 100;        // Pause for a keypress every so many clocks
     stopAtClk = -1;          // Stop the simulation after this many clocks
     stopAtM1 = -1;           // Stop at a specific M1 cycle number
     stopAtHalt = 1;          // Stop when HALT signal gets active
-    intAtClk = -1;           // Issue INT signal at that clock number
-    nmiAtClk = -1;           // Issue NMI signal at that clock number
-    busrqAtClk = -1;         // Issue BUSRQ signal at that clock number
-    resetAtClk = -1;         // Issue RESET signal at that clock number
-    waitAtClk = -1;          // Issue WAIT signal at that clock number
+    intAtClk = -1;           // Set INT signal at that clock number
+    intOffAtClk = -1;        // Reset INT signal at that clock number
+    nmiAtClk = -1;           // Set NMI signal at that clock number
+    nmiOffAtClk = -1;        // Reset NMI signal at that clock number
+    busrqAtClk = -1;         // Set BUSRQ signal at that clock number
+    busrqOffAtClk = -1;      // Reset BUSRQ signal at that clock number
+    resetAtClk = -1;         // Set RESET signal at that clock number
+    resetOffAtClk = -1;      // Reset RESET signal at that clock number
+    waitAtClk = -1;          // Set WAIT signal at that clock number
+    waitOffAtClk = -1;       // Reset WAIT signal at that clock number
     clearAtClk = -1;         // Clear all control signals at that clock number
     iorqVector = 0xFF;       // Push IORQ vector
     pauseAddress = 0;        // Pause at M1 at this address
@@ -385,10 +400,10 @@ void DumpState( bool suppress ) {
             sprintf( dbStr, "%02X", db );
         if ( T == 1 && clkCountHi )
             pf( F( "+-----------------------------------------------------------------+\r\n" ) );
-        pf( F( "| #%05d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s %s\r\n" ), clkCount < 0 ? 0 : clkCount,
+        pf( F( "| #%05d%c T%-4d AB:%s DB:%s  %s %s %s %s %s %s %s %s |%s%s%s%s%s %s\r\n" ), clkCount < 0 ? 0 : clkCount,
             clkCountHi ? 'H' : 'L', T, abStr, dbStr, m1 ? "  " : "M1", rfsh ? "    " : "RFSH", mreq ? "    " : "MREQ",
             rd ? "  " : "RD", wr ? "  " : "WR", iorq ? "    " : "IORQ", busak ? "     " : "BUSAK", halt ? "    " : "HALT",
-            zint ? "" : "[INT]", nmi ? "" : "[NMI]", busrq ? "" : "[BUSRQ]", wait ? "" : "[WAIT]", extraInfo );
+            reset ? " " : "R", nmi ? " " : "N", zint ? " " : "I", busrq ? " " : "B", wait ? " " : "W", extraInfo );
     }
     extraInfo[ 0 ] = 0;
 }
@@ -494,6 +509,9 @@ int controlHandler() {
             break;
 
         case 'X': // execute program from RAM
+            ioDataPort = 1; // default 6850 data port
+            ioStatPort = 2; // default 6850 status port
+            sscanf( input + 2, "%d %d", &ioDataPort, &ioStatPort );
             // no ROM, RAM starts at 0x0000
             ramBegin = 0x0000;
             ramEnd = ramBegin + sizeof( RAM ) - 1;       // full size ram
@@ -518,81 +536,110 @@ int controlHandler() {
             break;
 
         case 'C': // continue
+            // Continue from a paused simulation in single step mode
             running = singleStep = true;
             break;
 
         case 'R': // reset
-            // If the variable 9 (Issue RESET) is not set, perform a RESET and run the simulation.
-            // If the variable was set, skip reset sequence since we might be testing it.
+            // Perform a RESET and start the simulation in single step mode.
             ramBegin = 0;
             ramBeginHi = 0;
             ramEnd = ramBegin + ramLen - 1;
             ramEndHi = ramEnd >> 8;
-            if ( resetAtClk < 0 )
-                DoReset();
+            DoReset();
             running = singleStep = true;
             break;
 
         case '#':
-            // Option "#R" : reset simulation variables to their default values
-            if ( opt == 'R' ) {
+            // Option "##" : reset simulation variables to their default values
+            if ( opt == '#' ) {
                 ResetSimulationVars();
                 opt = 0; // Proceed to dump all variables...
             }
-            {
+            else {
                 // Show or set the simulation parameters
-                int var = 0, value;
-                int args = sscanf( input + 1, "%d %d", &var, &value );
-                // Parameter for the option #12 is read in as a hex; others are decimal by default
-                if ( var == 12 || var == 13 )
-                    args = sscanf( input + 1, "%d %x", &var, &value );
-                if ( args == 2 ) {
-                    if ( var == 0 )
-                        traceShowBothPhases = value;
-                    if ( var == 1 )
+                int value, value2;
+                int args = 0;
+                // Parameter for the option V and A is read in as a hex; others are decimal by default
+                if ( opt == 'V' || opt == 'A' )
+                    args = sscanf( input + 2, "%x", &value );
+                else if ( opt == 'I' || opt == 'N' || opt == 'B' || opt == 'W' || opt == 'R' ) 
+                    args = sscanf( input + 2, "%d %d", &value, &value2 );
+                else
+                    args = sscanf( input + 2, "%d", &value );
+                if ( args > 0 ) {
+                  switch ( opt ) {
+                    case 'L':
+                        traceAlsoLowPhase = value;
+                        break;
+                    case 'F':
                         traceRefresh = value;
-                    if ( var == 2 )
+                        break;
+                    case 'P':
                         tracePause = value;
-                    if ( var == 3 )
+                        break;
+                    case 'C':
                         stopAtClk = value;
-                    if ( var == 4 )
+                        break;
+                    case 'M':
                         stopAtM1 = value;
-                    if ( var == 5 )
+                        break;
+                    case 'H':
                         stopAtHalt = value;
-                    if ( var == 6 )
+                        break;
+                    case 'I':
                         intAtClk = value;
-                    if ( var == 7 )
+                        if ( args == 2 )
+                            intOffAtClk = value2;
+                        break;
+                    case 'N':
                         nmiAtClk = value;
-                    if ( var == 8 )
+                        if ( args == 2 )
+                            nmiOffAtClk = value2;
+                        break;
+                    case 'B':
                         busrqAtClk = value;
-                    if ( var == 9 )
+                        if ( args == 2 )
+                            busrqOffAtClk = value2;
+                        break;
+                    case 'R':
                         resetAtClk = value;
-                    if ( var == 10 )
+                        if ( args == 2 )
+                            resetOffAtClk = value2;
+                        break;
+                    case 'W':
                         waitAtClk = value;
-                    if ( var == 11 )
+                        if ( args == 2 )
+                            waitOffAtClk = value2;
+                        break;
+                    case '-':
                         clearAtClk = value;
-                    if ( var == 12 )
+                        break;
+                    case 'V':
                         iorqVector = value & 0xFF;
-                    if ( var == 13 )
+                        break;
+                    case 'A':
                         pauseAddress = value & 0xFFFF;
+                        break;
+                  }
                 }
-                pf( F( "  ------ Simulation variables --------\r\n" ) );
-                pf( F( "  #0  Trace both clock phases  = %4d\r\n" ), traceShowBothPhases );
-                pf( F( "  #1  Trace refresh cycles     = %4d\r\n" ), traceRefresh );
-                pf( F( "  #2  Pause for keypress every = %4d\r\n" ), tracePause );
-                pf( F( "  #3  Stop after clock #       = %4d\r\n" ), stopAtClk );
-                pf( F( "  #4  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
-                pf( F( "  #5  Stop at HALT             = %4d\r\n" ), stopAtHalt );
-                pf( F( "  #6  Issue INT at clock #     = %4d\r\n" ), intAtClk );
-                pf( F( "  #7  Issue NMI at clock #     = %4d\r\n" ), nmiAtClk );
-                pf( F( "  #8  Issue BUSRQ at clock #   = %4d\r\n" ), busrqAtClk );
-                pf( F( "  #9  Issue RESET at clock #   = %4d\r\n" ), resetAtClk );
-                pf( F( "  #10 Issue WAIT at clock #    = %4d\r\n" ), waitAtClk );
-                pf( F( "  #11 Clear all at clock #     = %4d\r\n" ), clearAtClk );
-                pf( F( "  #12 Push IORQ vector #(hex)  =   %02X\r\n" ), iorqVector );
-                pf( F( "  #13 Pause at M1 from #(hex)  = %04X\r\n" ), pauseAddress );
-                break;
             }
+            pf( F( "  ------ Simulation variables --------\r\n" ) );
+            pf( F( "  #L  Trace also Low clock     = %4d\r\n" ), traceAlsoLowPhase );
+            pf( F( "  #F  Trace reFresh cycles     = %4d\r\n" ), traceRefresh );
+            pf( F( "  #K  Pause for keypress every = %4d\r\n" ), tracePause );
+            pf( F( "  #A  Pause at M1 Addr. #(hex  = %04X\r\n" ), pauseAddress );
+            pf( F( "  #C  Stop after Clock #       = %4d\r\n" ), stopAtClk );
+            pf( F( "  #M  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
+            pf( F( "  #H  Stop at HALT             = %4d\r\n" ), stopAtHalt );
+            pf( F( "  #V  IORQ vector #(hex)       =   %02X\r\n" ), iorqVector );
+            pf( F( "  #I  INT at clock #           = %4d %4d\r\n" ), intAtClk, intOffAtClk );
+            pf( F( "  #N  NMI at clock #           = %4d %4d\r\n" ), nmiAtClk, nmiOffAtClk );
+            pf( F( "  #B  BUSRQ at clock #         = %4d %4d\r\n" ), busrqAtClk, busrqOffAtClk );
+            pf( F( "  #R  RESET at clock #         = %4d %4d\r\n" ), resetAtClk, resetOffAtClk );
+            pf( F( "  #W  WAIT at clock #          = %4d %4d\r\n" ), waitAtClk, waitOffAtClk );
+            pf( F( "  #-  Clear all at clock #     = %4d\r\n" ), clearAtClk );
+            break;
 
         case 'M':   // memory
         case 'I': { // IO
@@ -722,32 +769,32 @@ int controlHandler() {
         case '?':
         case 'H':
             // Print help
-            pf( F( "A               - analyse Grant Searle's ROM Basic\r\n" ) );
-            pf( F( "AT              - analyse Li Chen Wang's tiny ROM Basic\r\n" ) );
-            pf( F( "AX              - analyse Hein Pragt's ROM Basic\r\n" ) );
-            pf( F( "B               - execute Grant Searle's ROM Basic\r\n" ) );
-            pf( F( "BT              - execute Li Chen Wang's tiny ROM Basic\r\n" ) );
-            pf( F( "BX              - execute Hein Pragt's ROM Basic\r\n" ) );
-            pf( F( "X               - execute the RAM content\r\n" ) );
-            pf( F( "R               - reset CPU, start the simulation at RAM address 0x0000\r\n" ) );
-            pf( F( "C               - continue the simulation after halt\r\n" ) );
-            pf( F( ":INTEL-HEX      - reload RAM buffer with ihex data stream\r\n" ) );
-            pf( F( ".INTEL-HEX      - reload IO buffer with a modified ihex data stream\r\n" ) );
-            pf( F( "M START END     - dump the RAM buffer from START to END\r\n" ) );
-            pf( F( "MA START END    - dump the RAM buffer from START to END (with ASCII)\r\n" ) );
-            pf( F( "MX START END    - dump the RAM buffer as ihex from START to END\r\n" ) );
-            pf( F( "MR              - reset the RAM buffer to 00\r\n" ) );
-            pf( F( "MS ADR B B B .. - set RAM buffer at ADR with data byte(s) B\r\n" ) );
-            pf( F( "I START END     - dump the IO buffer from START to END\r\n" ) );
-            pf( F( "IX START END    - dump the IO buffer as modified ihex from START to END\r\n" ) );
-            pf( F( "IR              - reset the IO buffer to 00\r\n" ) );
-            pf( F( "IS ADR B B B .. - set IO buffer at ADR with data byte(s) B\r\n" ) );
-            pf( F( "#               - show simulation variables\r\n" ) );
-            pf( F( "#N VALUE        - set simulation variable number N to a VALUE\r\n" ) );
-            pf( F( "#R              - reset simulation variables to their default values\r\n" ) );
-            pf( F( "E0              - set echo off\r\n" ) );
-            pf( F( "E1              - set echo on (default)\r\n" ) );
-            pf( F( "VN              - set verboseMode to N (default = 0)\r\n" ) );
+            pf( F( "A                - analyse Grant Searle's ROM Basic\r\n" ) );
+            pf( F( "AT               - analyse Li Chen Wang's tiny ROM Basic\r\n" ) );
+            pf( F( "AX               - analyse Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "B                - execute Grant Searle's ROM Basic\r\n" ) );
+            pf( F( "BT               - execute Li Chen Wang's tiny ROM Basic\r\n" ) );
+            pf( F( "BX               - execute Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "X [DATA [STAT]]  - execute the RAM content, opt. data and status port\r\n" ) );
+            pf( F( "R                - reset CPU, start the simulation at RAM address 0x0000\r\n" ) );
+            pf( F( "C                - continue the simulation after halt\r\n" ) );
+            pf( F( ":INTEL-HEX       - reload RAM buffer with ihex data stream\r\n" ) );
+            pf( F( ".INTEL-HEX       - reload IO buffer with a modified ihex data stream\r\n" ) );
+            pf( F( "M [START [END]]  - dump the RAM buffer from START to END\r\n" ) );
+            pf( F( "MA [START [END]] - dump the RAM buffer from START to END (with ASCII)\r\n" ) );
+            pf( F( "MX [START [END]] - dump the RAM buffer as ihex from START to END\r\n" ) );
+            pf( F( "MR               - reset the RAM buffer to 00\r\n" ) );
+            pf( F( "MS ADR B B B ..  - set RAM buffer at ADR with data byte(s) B\r\n" ) );
+            pf( F( "I [START [END]]  - dump the IO buffer from START to END\r\n" ) );
+            pf( F( "IX [START [END]] - dump the IO buffer as modified ihex from START to END\r\n" ) );
+            pf( F( "IR               - reset the IO buffer to 00\r\n" ) );
+            pf( F( "IS ADR B B B ..  - set IO buffer at ADR with data byte(s) B\r\n" ) );
+            pf( F( "#                - show simulation variables\r\n" ) );
+            pf( F( "#N VALUE         - set simulation variable number N to a VALUE\r\n" ) );
+            pf( F( "#R               - reset simulation variables to their default values\r\n" ) );
+            pf( F( "E0               - set echo off\r\n" ) );
+            pf( F( "E1               - set echo on (default)\r\n" ) );
+            pf( F( "VN               - set verboseMode to N (default = 0)\r\n" ) );
             break;
         } // switch ( cmd )
     }     // while ( !running )
@@ -939,7 +986,7 @@ void loop() {
     digitalWrite( CLK, LOW );
 
     clkCountHi = 0;
-    if ( traceShowBothPhases ) {
+    if ( traceAlsoLowPhase ) {
         ReadControlState();
         GetAddressFromAB();
         DumpState( suppressDump );
@@ -950,14 +997,24 @@ void loop() {
     if ( clkCount >= 0 ) {
         if ( clkCount == intAtClk )
             zint = 0;
+        if ( clkCount == intOffAtClk )
+            zint = 1;
         if ( clkCount == nmiAtClk )
             nmi = 0;
+        if ( clkCount == nmiOffAtClk )
+            nmi = 1;
         if ( clkCount == busrqAtClk )
             busrq = 0;
+        if ( clkCount == busrqOffAtClk )
+            busrq = 1;
         if ( clkCount == resetAtClk )
             reset = 0;
+        if ( clkCount == resetOffAtClk )
+            reset = 1;
         if ( clkCount == waitAtClk )
             wait = 0;
+        if ( clkCount == waitOffAtClk )
+            wait = 1;
         // De-assert all control pins at this clock number
         if ( clkCount == clearAtClk )
             zint = nmi = busrq = reset = wait = 1;
@@ -1231,18 +1288,18 @@ ISR( INT2_vect ) { // Handle RD
         } else { // ROM read
             DATA_PUT( pgm_read_byte( ROM + (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) ) );
         }
-    } else if ( zIORQ ) {     // Handle IORQ
-        if ( ADDR_LO == 1 ) { // Port 1 returns character from keyboard
+    } else if ( zIORQ ) {     // Handle IORQ - Simulate 6850 at addresses 1 and 2
+        if ( ADDR_LO == ioDataPort ) { // Port 1 returns character from keyboard
             if ( Serial.available() == 0 ) {
                 DATA_PUT( 0 );
             } else {
                 DATA_PUT( (char)Serial.read() );
             }
-        } else if ( ADDR_LO == 2 ) { // Port 2 returns a nonzero value if a key has been pressed.
+        } else if ( ADDR_LO == ioStatPort ) { // Port 2 returns bit 0 set if a key has been pressed.
             if ( Serial.available() > 0 ) {
-                DATA_PUT( 0x01 );
+                DATA_PUT( 0x03 ); // RDRF=1, TDRE=1
             } else {
-                DATA_PUT( 0 );
+                DATA_PUT( 0x02 ); // RDRF=0, TDRE=1
             }
         } else             // other ports
             DATA_PUT( 0 ); // Otherwise, it returns 0

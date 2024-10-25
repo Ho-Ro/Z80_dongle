@@ -63,7 +63,7 @@ RST10:          RST     $18
 
                 .ORG    0018H
 RST18:          IN      A,(STAT6850)    ; 6850 Status Register
-                OR      A               ; 6850 Receive Data Register Full
+                AND     1               ; 6850 Receive Data Register Full
                 RET
 
                 .DC     0020H-$,0

@@ -394,7 +394,8 @@ WSTART:         LD      SP,STACK    ;*** WARM START ***
 ST2:            LD      HL,0000     ;
                 LD      (LOPVAR),HL
                 LD      (STKGOS),HL
-ST3:            LD      A,'>'       ;PROMPT '>' AND
+ST3:            ;LD      A,'>'       ;PROMPT '>' AND
+                XOR     A           ;NO PROMPT LIKE MBASIC
                 CALL    GETLN       ;READ A LINE
                 PUSH    DE          ;DE->END OF LINE
                 LD      DE,BUFFER   ;DE->BEGINNING OF LINE
