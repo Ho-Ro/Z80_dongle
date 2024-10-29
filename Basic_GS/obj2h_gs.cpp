@@ -23,7 +23,7 @@ int main( int argc, char *argv[] ) {
 	printf( "// * Updates were made by Grant Searle.\n" );
 	printf( "// * Further updates from 8bitforce.\n\n" );
 
-	printf( "PROGMEM const uint8_t rom_gs[] = {" );
+	printf( "const uint8_t rom_gs[] PROGMEM = {" );
 
 
 	for ( int iii = 0; iii < intminisize; ++iii ) {

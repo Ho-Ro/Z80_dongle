@@ -8,7 +8,7 @@ PORT = /dev/ttyACM0
 
 
 INO = $(PRJ)/$(PRJ).ino
-ASM = Basic_GS/intmini.asm Basic_GS/basic.asm TinyBasic2/tinybasic2.asm
+ASM = Basic_GS/intmini.asm Basic_GS/basic.asm TinyBasic2/tinybasic2.asm basic1K/basic1K.asm
 OPC = opcodes/opcode*.txt opcodes/*.py opcodes/Makefile
 
 BUILD = $(PRJ)/build/$(subst :,.,$(FQBN))
@@ -22,6 +22,7 @@ $(DONGLE): $(INO) $(ASM) $(INC) $(OPC) Makefile
 	make -C opcodes
 	make -C Basic_GS
 	make -C TinyBasic2
+	make -C basic1K
 	arduino-cli compile --export-binaries --warnings all --fqbn $(FQBN) $<
 
 

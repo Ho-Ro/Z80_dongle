@@ -13,7 +13,7 @@ clean:
 
 
 ../Z80_dongle/TinyBasic2.h: tinybasic2_rom.cim obj2h
-	./obj2h $< $(ROMSIZE) > $@
+	./obj2h $< $(ROMSIZE) rom_tb2 > $@
 
 tinybasic2.hex: tinybasic2.cim
 	srec_cat $< -binary -output $@ -intel --address-length=2

@@ -45,6 +45,9 @@
 //  Li Chen Wang's Tiny Basic ROM
 #include "TinyBasic2.h"
 
+//  Will Stevens' 1K Basic ROM
+#include "basic1K.h"
+
 #include "opcodes.h"
 
 const uint32_t BAUDRATE = 115200;
@@ -204,7 +207,8 @@ static char *ftmp = (char *)RAM + sizeof( RAM ) - INPUT_SIZE - ioLen - tmpLen - 
 static int doEcho = 1;      // Echo received commands
 static int verboseMode = 0; // Enable debugging output
 
-static uint8_t analyseBasic = 0;
+static uint8_t cmd = 0;
+static uint8_t opt = 0;
 
 // default 6850 ACIA port addresses
 static int ioDataPort = 1;
@@ -461,31 +465,32 @@ int controlHandler() {
             while ( *pTemp && isspace( *pTemp ) )
                 ++pTemp; // skip leading space
         }
-        char cmd = toupper( input[ 0 ] );
-        char opt = toupper( input[ 1 ] );
-        switch ( cmd ) {
+        cmd = input[ 0 ];
+        opt = input[ 1 ];
+        switch ( toupper( cmd ) ) {
         // this entry selects one of the three Basic setups
         // either for analysis (A) or execution (B)
         case 'A':
         case 'B':
             // "move" the RAM on top of ROM
-            if ( opt == 'X' ) { // Hein's Basic
+            if ( toupper( opt ) == 'X' ) { // Hein's Basic
                 ROM = rom_hp;
                 ramBegin = 0x2000;
-                analyseBasic = 'x';
-            } else if ( opt == 'T' ) { // Tiny Basic
+            } else if ( toupper( opt ) == 'T' ) { // Tiny Basic
                 ROM = rom_tb2;
                 ramBegin = 0x0800;
-                analyseBasic = 't';
+            } else if ( toupper( opt ) == '1' ) { // 1K Basic
+                ROM = rom_b1k;
+                ramBegin = 0x0400;
             } else { // default, Grant's Basic
                 ROM = rom_gs;
                 ramBegin = 0x2000;
-                analyseBasic = 'b';
+                opt = 'B';
             }
 
-            if ( cmd == 'A' ) { // analyse
+            if ( toupper( cmd ) == 'A' ) { // analyse
                 ramEnd = ramBegin + ramLen - 1;
-                if ( opt != 'T' ) { // 8 K BASIC
+                if ( toupper( opt ) != 'T' ) { // 8 K BASIC
                     // signal 4K memory size to Basic
                     RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                     RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
@@ -494,13 +499,16 @@ int controlHandler() {
             } else { // run Basic
                 memset( RAM, 0, sizeof( RAM ) );
                 ramEnd = ramBegin + sizeof( RAM ) - 1;
-                if ( opt != 'T' ) { // 8 K BASIC
+                if ( toupper( opt ) == 'B' || toupper( opt ) == 'X' ) { // 8 K BASIC
                     // signal memory size to Basic
                     RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                     RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
                     runWithInterrupt( 0x2000, sizeof( RAM ) ); // returns after 'MONITOR' cmd
-                } else                                         // Tiny BASIC
+                } else if (toupper( opt ) == 'T') {            // Tiny BASIC
                     runWithInterrupt( 0x800, sizeof( RAM ) );  // returns after 'HALT' cmd
+                } else {                                       // 1K BASIC
+                    runWithInterrupt( 0x400, sizeof( RAM ) );  // does not return
+                }
                 while ( Serial.available() )
                     Serial.read(); // clear buffer
                 pf( F( "BASIC halted\r\n" ) );
@@ -561,14 +569,15 @@ int controlHandler() {
                 int value, value2;
                 int args = 0;
                 // Parameter for the option V and A is read in as a hex; others are decimal by default
-                if ( opt == 'V' || opt == 'A' )
+                if ( toupper( opt ) == 'V' || toupper( opt ) == 'A' )
                     args = sscanf( input + 2, "%x", &value );
-                else if ( opt == 'I' || opt == 'N' || opt == 'B' || opt == 'W' || opt == 'R' ) 
+                else if ( toupper( opt ) == 'I' || toupper( opt ) == 'N' || toupper( opt ) == 'B'
+                       || toupper( opt ) == 'W' || toupper( opt ) == 'R' )
                     args = sscanf( input + 2, "%d %d", &value, &value2 );
                 else
                     args = sscanf( input + 2, "%d", &value );
                 if ( args > 0 ) {
-                  switch ( opt ) {
+                  switch ( toupper( opt ) ) {
                     case 'L':
                         traceAlsoLowPhase = value;
                         break;
@@ -643,19 +652,20 @@ int controlHandler() {
 
         case 'M':   // memory
         case 'I': { // IO
-            if ( cmd == 'M' && opt == 'R' ) {
+            if ( toupper( cmd ) == 'M' && toupper( opt ) == 'R' ) {
                 // Option "MR"  : reset RAM memory
                 memset( RAM, 0, ramLen );
                 pf( F( "RAM reset to 00\r\n" ) );
-            } else if ( cmd == 'I' && opt == 'R' ) {
+            } else if ( toupper( cmd ) == 'I' && toupper( opt ) == 'R' ) {
                 // Option "IR"  : reset IO memory
                 memset( IO, 0, ioLen );
                 pf( F( "IO reset to 00\r\n" ) );
-            } else if ( ( cmd == 'M' || cmd == 'I' ) && opt == 'S' ) {
+            } else if ( ( toupper( cmd ) == 'M' || toupper( cmd ) == 'I' )
+                       && toupper( opt ) == 'S' ) {
                 // Option "MS"  : set RAM memory from ADR to byte(s) B
-                // Option "MS"  : set IO memory from ADR to byte(s) B
+                // Option "IS"  : set IO memory from ADR to byte(s) B
                 // ms/is ADR B B B ...
-                bool isRam = cmd == 'M';
+                bool isRam = toupper( cmd ) == 'M';
                 int i = 2;
                 if ( !isxdigit( input[ 2 ] ) )
                     i = nextHex( input, 0 ); // skip to start of adr
@@ -683,14 +693,14 @@ int controlHandler() {
             // START defaults to 0 or ADR from "ms adr ..."
             // END defaults to START + 0x100
             // Option "MX" : same in intel hex format
-            bool isRam = cmd == 'M';
+            bool isRam = toupper( cmd ) == 'M';
             bool isHex = false;
             bool asASCII = false;
             int i = 1, rc = 0;
-            if ( opt == 'X' ) {
+            if ( toupper( opt ) == 'X' ) {
                 isHex = true;
                 i = 2;
-            } else if ( opt == 'A' ) {
+            } else if ( toupper( opt ) == 'A' ) {
                 asASCII = true;
                 i = 2;
             }
@@ -796,7 +806,7 @@ int controlHandler() {
             pf( F( "E1               - set echo on (default)\r\n" ) );
             pf( F( "VN               - set verboseMode to N (default = 0)\r\n" ) );
             break;
-        } // switch ( cmd )
+        } // switch ( toupper( cmd ) )
     }     // while ( !running )
     return singleStep;
 }
@@ -937,9 +947,9 @@ void loop() {
             GetDataFromDB();
             IO[ ab & ioMask ] = db;
             sprintf( extraInfo, "I/O write to %04X <- %02X", ab, db );
-            if ( ( analyseBasic == 'x' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
-                 ( analyseBasic == 't' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ||
-                 ( analyseBasic == 'b' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
+            if ( ( toupper( opt ) == 'X' && ioWrPrev && ( ( ab & 0xFF ) == 0 ) ) ||
+                 ( toupper( opt ) == 'T' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ||
+                 ( toupper( opt ) == 'B' && ioWrPrev && ( ( ab & 0xFF ) == 1 ) ) ) // console out
                 sprintf( extraInfo + strlen( extraInfo ), "  CONOUT: %c", isprint( db ) ? db : ' ' );
         }
 
@@ -1174,7 +1184,7 @@ inline void BUSRQ_LOW() { PORTH &= ~( 1 << BUSRQ_PIN_NAME ); }
 inline void BUSRQ_HIGH() { PORTH |= ( 1 << BUSRQ_PIN_NAME ); }
 
 
-const long fClk = 100000; // Z80 clock speed
+const long fClk = 200000; // Z80 clock speed must be <= 200 kHz
 
 
 void runWithInterrupt( uint16_t romLen, uint16_t ramLen ) {
@@ -1293,7 +1303,7 @@ ISR( INT2_vect ) { // Handle RD
             if ( Serial.available() == 0 ) {
                 DATA_PUT( 0 );
             } else {
-                DATA_PUT( (char)Serial.read() );
+                DATA_PUT( islower( cmd ) ? (char)Serial.read() : toupper( (char)Serial.read() ) );
             }
         } else if ( ADDR_LO == ioStatPort ) { // Port 2 returns bit 0 set if a key has been pressed.
             if ( Serial.available() > 0 ) {
