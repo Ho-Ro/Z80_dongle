@@ -1798,14 +1798,14 @@
 1792:	07E4  83AA    	                DWA     XP11
 1793:	07E6  23      	                .DB     "#"
 1794:	07E7  83B0    	                DWA     XP12
-1795:	07E9  3E      	                .DB     ">"
-1796:	07EA  83B6    	                DWA     XP13
-1797:	07EC  3D      	                .DB     "="
-1798:	07ED  83C5    	                DWA     XP15
-1799:	07EF  3C3D    	                .DB     "<="
-1800:	07F1  83BD    	                DWA     XP14
-1801:	07F3  3C3E    	                .DB     "<>"
-1802:	07F5  83B0    	                DWA     XP12
+1795:	07E9  3C3E    	                .DB     "<>"
+1796:	07EB  83B0    	                DWA     XP12
+1797:	07ED  3E      	                .DB     ">"
+1798:	07EE  83B6    	                DWA     XP13
+1799:	07F0  3D      	                .DB     "="
+1800:	07F1  83C5    	                DWA     XP15
+1801:	07F3  3C3D    	                .DB     "<="
+1802:	07F5  83BD    	                DWA     XP14
 1803:	07F7  3C      	                .DB     "<"
 1804:	07F8  83CB    	                DWA     XP16
 1805:	07FA  83D1    	                DWA     XP17            ; END OF REL OPERATOR LIST
@@ -1819,7 +1819,7 @@
 1813:	0001          	                .ASSERT $ <= RAMBGN
 1814:			
 1815:			
-1816:			                ;.DC     RAMBGN-$,$00    ; fill with $00 until RAMBGN
+1816:	07FC ..07FF 00	                .DC     RAMBGN-$,$00    ; fill with $00 until RAMBGN
 1817:			;
 1818:			;
 1819:			; *************************************************************
@@ -1873,7 +1873,7 @@ Statistics:
      4	passes
      0	jr promotions
    225	symbols
-  2044	bytes
+  2048	bytes
 
     63	macro calls
    203	macro bytes
