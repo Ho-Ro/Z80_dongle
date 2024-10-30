@@ -13,9 +13,12 @@
 ;
 ;==================================================================================
 
-ramBegin        .EQU    02000H
+BASICCOLD       .EQU    0150H
+BASICWARM       .EQU    BASICCOLD + 3
+
+ramBegin        .EQU    2000H
 basicStarted    .EQU    ramBegin + 2
-TEMPSTACK       .EQU    020EDH          ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+TEMPSTACK       .EQU    20F0H           ; Top of BASIC line input buffer so is "free ram" when BASIC resets
 
 ; Minimum 6850 ACIA polled serial I/O
 
@@ -104,22 +107,22 @@ CORW:
                 RST     08H
 COLDSTART:      LD      A,'Y'           ; Set the BASIC STARTED flag
                 LD      (basicStarted),A
-                JP      0150H           ; Start BASIC COLD
+                JP      BASICCOLD       ; Start BASIC COLD
 CHECKWARM:
                 CP      'W'
                 JR      NZ, CORW
                 RST     08H
-                LD      A,0DH
+                LD      A,CR
                 RST     08H
-                LD      A,0AH
+                LD      A,LF
                 RST     08H
-                JP      0153H           ; Start BASIC WARM
+                JP      BASICWARM       ; Start BASIC WARM
 
 SIGNON1:        .DB     CS
                 .DB     "Z80 SBC By Grant Searle",CR,LF,0
 SIGNON2:        .DB     CR,LF
                 .DB     "(C)old or (W)arm start?",0
 
-                .DC     (00150H - $), 0
+                .DC     (BASICCOLD - $), 0
 
 .END
