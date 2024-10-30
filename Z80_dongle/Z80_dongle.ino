@@ -214,6 +214,9 @@ static uint8_t opt = 0;
 static int ioDataPort = 1;
 static int ioStatPort = 2;
 
+// the default Arduino LED
+const int ledZ80isRunning = 13;
+
 
 // -----------------------------------------------------------
 // Arduino initialization entry point
@@ -232,6 +235,9 @@ void setup() {
         Serial.read();
 
     ResetSimulationVars();
+
+    pinMode( ledZ80isRunning, OUTPUT );
+    digitalWrite( ledZ80isRunning, LOW );
 
     // By default, all Arduino pins are set as inputs
     DDR_AL = 0x00;
@@ -1191,6 +1197,8 @@ void runWithInterrupt( uint16_t romLen, uint16_t ramLen ) {
     // Serial.begin( BAUDRATE );
     Serial.println( "Start Z80" );
 
+    digitalWrite( ledZ80isRunning, HIGH );
+
     // Z80 CTRL OUT
     pinMode( M1, INPUT_PULLUP );   // M1
     pinMode( IORQ, INPUT_PULLUP ); // IOREQ
@@ -1254,6 +1262,7 @@ void runWithInterrupt( uint16_t romLen, uint16_t ramLen ) {
             TCCR2A = 0;                                      // stop CLK
             TCCR2B = 0;
             digitalWrite( CLK, LOW );
+            digitalWrite( ledZ80isRunning, LOW );
             return;
         }
     }
