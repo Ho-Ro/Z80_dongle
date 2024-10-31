@@ -496,7 +496,7 @@ int controlHandler() {
 
             if ( toupper( cmd ) == 'A' ) { // analyse
                 ramEnd = ramBegin + ramLen - 1;
-                if ( toupper( opt ) != 'T' ) { // 8 K BASIC
+                if ( toupper( opt ) == 'X' ) { // Hein's 8 K BASIC need RAM size info
                     // signal 4K memory size to Basic
                     RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                     RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
@@ -505,15 +505,17 @@ int controlHandler() {
             } else { // run Basic
                 memset( RAM, 0, sizeof( RAM ) );
                 ramEnd = ramBegin + sizeof( RAM ) - 1;
-                if ( toupper( opt ) == 'B' || toupper( opt ) == 'X' ) { // 8 K BASIC
+                if ( toupper( opt ) == 'X' ) { // Hein's 8 K BASIC needs RAM size info
                     // signal memory size to Basic
                     RAM[ 0 ] = ( ramEnd + 1 ) & 0xFF;
                     RAM[ 1 ] = ( ramEnd + 1 ) >> 8;
                     runWithInterrupt( 0x2000, sizeof( RAM ) ); // returns after 'MONITOR' cmd
+                } else if (toupper( opt ) == 'B') {            // NASCOM ROM BASIC
+                    runWithInterrupt( 0x2000, sizeof( RAM ) );  // returns after 'MONITOR' cmd
                 } else if (toupper( opt ) == 'T') {            // Tiny BASIC
                     runWithInterrupt( 0x800, sizeof( RAM ) );  // returns after 'HALT' cmd
                 } else {                                       // 1K BASIC
-                    runWithInterrupt( 0x400, sizeof( RAM ) );  // does not return
+                    runWithInterrupt( 0x400, sizeof( RAM ) );  // does not return w/o tricks
                 }
                 while ( Serial.available() )
                     Serial.read(); // clear buffer

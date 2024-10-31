@@ -13,12 +13,13 @@
 ;
 ;==================================================================================
 
-BASICCOLD       .EQU    0150H
+BASICCOLD       .EQU    0100H
 BASICWARM       .EQU    BASICCOLD + 3
 
-ramBegin        .EQU    2000H
-basicStarted    .EQU    ramBegin + 2
-TEMPSTACK       .EQU    20F0H           ; Top of BASIC line input buffer so is "free ram" when BASIC resets
+RAMBEGIN        .EQU    2000H
+RAMSIZE         .EQU    1A00H
+basicStarted    .EQU    RAMBEGIN
+TEMPSTACK       .EQU    RAMBEGIN + RAMSIZE ; Top of RAM
 
 ; Minimum 6850 ACIA polled serial I/O
 
@@ -45,7 +46,7 @@ RST00:          DI                      ;Disable interrupts
 ; TX a character over RS232
 
                 .ORG    0008H
-RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
+TX:             OUT     (DATA6850),A    ; 6850 Transmit Data Register
                 RET
 
                 .DC     0010H-$,0       ; Padding so RST10 starts at org 0x0010H
@@ -54,8 +55,8 @@ RST08:          OUT     (DATA6850),A    ; 6850 Transmit Data Register
 ; RX a character over RS232 Channel A [Console], hold here until char ready.
 
                 .ORG    0010H
-RST10:          RST     $18
-                JR      Z,RST10
+RX:             RST     $18
+                JR      Z,RX
                 IN      A,(DATA6850)     ; 6850 Receive Data Register
                 RET
 
@@ -77,7 +78,7 @@ RST18:          IN      A,(STAT6850)    ; 6850 Status Register
 PRINT:          LD      A,(HL)          ; Get character
                 OR      A               ; Is it $00 ?
                 RET     Z               ; Then RETurn on terminator
-                RST     08H             ; Print it
+                RST     TX              ; Print it
                 INC     HL              ; Next Character
                 JR      PRINT           ; Continue until $00
                 RET
@@ -88,40 +89,41 @@ INIT:
                 LD      HL,TEMPSTACK    ; Temp stack
                 LD      SP,HL           ; Set up a temporary stack
 
-                LD      HL,SIGNON1      ; Sign-on message
-                CALL    PRINT           ; Output string
+                ;LD      HL,SIGNON1      ; Sign-on message
+                ;CALL    PRINT           ; Output string
+
                 LD      A,(basicStarted); Check the BASIC STARTED flag
-                CP      'Y'             ; to see if this is power-up
+                CP      JP              ; to see if this is power-up
                 JR      NZ,COLDSTART    ; If not BASIC started then always do cold start
                 LD      HL,SIGNON2      ; Cold/warm message
                 CALL    PRINT           ; Output string
 CORW:
-                RST     10H
+                RST     RX
                 AND     11011111B       ; lower to uppercase
                 CP      'C'
                 JR      NZ, CHECKWARM
-                RST     08H
+                RST     TX
                 LD      A,0DH
-                RST     08H
+                RST     TX
                 LD      A,0AH
-                RST     08H
-COLDSTART:      LD      A,'Y'           ; Set the BASIC STARTED flag
+                RST     TX
+COLDSTART:      LD      A,JP            ; Set the BASIC STARTED flag
                 LD      (basicStarted),A
                 JP      BASICCOLD       ; Start BASIC COLD
 CHECKWARM:
                 CP      'W'
                 JR      NZ, CORW
-                RST     08H
+                RST     TX
                 LD      A,CR
-                RST     08H
+                RST     TX
                 LD      A,LF
-                RST     08H
+                RST     TX
                 JP      BASICWARM       ; Start BASIC WARM
 
-SIGNON1:        .DB     CS
-                .DB     "Z80 SBC By Grant Searle",CR,LF,0
+;SIGNON1:        .DB     CS
+;                .DB     "Z80 SBC By Grant Searle",CR,LF,0
 SIGNON2:        .DB     CR,LF
-                .DB     "(C)old or (W)arm start?",0
+                .DB     "(C)old or (W)arm start? ",0
 
                 .DC     (BASICCOLD - $), 0
 

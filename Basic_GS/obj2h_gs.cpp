@@ -4,16 +4,16 @@
 
 
 int main( int argc, char *argv[] ) {
-	int intminisize = 0x150;
-	int basicsize = 0x2000-intminisize;
+	int intminisize = 0x100;
+	int basicsize = 0x2000;
 	FILE *in;
 	uint8_t intmini[ intminisize ] = { 0 };
 	uint8_t basic[ basicsize ] = { 0 };
 	in = fopen( "intmini.cim", "rb" );
-	fread( intmini, 1, sizeof( intmini ), in );
+	fread( intmini, 1, intminisize, in );
 	fclose( in );
 	in = fopen( "basic.cim", "rb" );
-	basicsize = fread( basic, 1, sizeof( basic ), in );
+	basicsize = fread( basic, 1, basicsize, in );
 	fclose( in );
 
 	printf( "#ifndef ROM_GS_H\n#define ROM_GS_H\n\n" );

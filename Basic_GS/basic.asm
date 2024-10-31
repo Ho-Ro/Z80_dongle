@@ -37,13 +37,18 @@ ESC     .EQU   1BH             ; Escape
 SPACE   .EQU   20H             ; Space
 DEL     .EQU   7FH             ; Delete
 
+ROMSIZE .EQU    2000H
+RAMSTRT .EQU    ROMSIZE
+RAMSIZE .EQU    1A00H          ; use 6.5K RAM from dongle
+RAMEND  .EQU    RAMSTRT + RAMSIZE
+
+
 ; BASIC WORK SPACE LOCATIONS
 
-        .ORG   2000H
+        .ORG   RAMSTRT
 
-RAMSTART .ds    45H     ; .EQU   2000H           ; Start of RAM
-WRKSPC  .ds     3       ; .EQU   2045H           ; BASIC Work space
-USR     .ds     3       ; .EQU   WRKSPC + 3H     ; "USR (x)" jump
+WRKSPC  .ds     3       ; .EQU   2000H           ; BASIC Work space
+USRJP   .ds     3       ; .EQU   2003H = 8195    ; "USR (x)" jump
 OUTSUB  .ds     3       ; .EQU   WRKSPC + 6H     ; "OUT p,n"
 OTPORT  .equ    OUTSUB+1 ; .EQU   WRKSPC + 7H     ; Port (p)
 DIVSUP  .ds     14      ; .EQU   WRKSPC + 9H     ; Division support routine
@@ -74,7 +79,7 @@ LINEAT  .ds     2       ; .EQU   WRKSPC + 5CH    ; Current line number
 BASTXT  .ds     2       ; .EQU   WRKSPC + 5EH    ; Pointer to start of program
         .ds     1
 BUFFER  .ds     74      ; .EQU   WRKSPC + 61H    ; Input buffer
-STACK   .equ    BUFFER+74 ; .EQU   WRKSPC + 66H    ; Initial stack
+STACK   .EQU   WRKSPC + 66H    ; Initial stack
 CURPOS  .ds     1       ; .EQU   WRKSPC + 0ABH   ; Character position on line
 LCRFLG  .ds     1       ; .EQU   WRKSPC + 0ACH   ; Locate/Create flag
 TYPE    .ds     1       ; .EQU   WRKSPC + 0ADH   ; Data type flag
@@ -106,7 +111,8 @@ SGNRES  .ds     1       ; .EQU   WRKSPC + 0E8H   ; Sign of result
 PBUFF   .ds     13      ; .EQU   WRKSPC + 0E9H   ; Number print buffer
 MULVAL  .ds     3       ; .EQU   WRKSPC + 0F6H   ; Multiplier
 PROGST  .ds     1       ; .EQU   WRKSPC + 0F9H   ; Start of program text area
-STLOOK  .EQU   WRKSPC + 15DH   ; Start of memory test
+
+STLOOK  .EQU   WRKSPC + 0200H   ; Start of memory test
 
 ; BASIC ERROR CODE VALUES
 
@@ -132,22 +138,24 @@ MO      .EQU   24H             ; Missing operand
 HE      .EQU   26H             ; HEX error
 BN      .EQU   28H             ; BIN error
 
-        .ORG   0150H
 
-COLD:   JP      STARTB          ; Jump for cold start
+        .ORG   0100H
+
+COLD:   JP      CSTART          ; Jump for cold start
 WARM:   JP      WARMST          ; Jump for warm start
 
 ; USR(X) at 0x2048 = 8264 is called with a single argument.
 ; Get the int16_t argument in DE by calling DEINT.
 ; Put return int16_t value in AB and call ABPASS.
 ;
-        .DW     DEINT           ; $0156: Get int16_t in DE
-        .DW     ABPASS          ; $0158: Return int16_t in AB
+        JP     DEINT            ; Get int16_t argument in DE
+        JP     ABPASS           ; Return int16_t result in AB
 
-STARTB: LD      IX,0            ; Flag cold start ???
-CSTART: LD      HL,WRKSPC       ; Start of workspace RAM
+CSTART: LD      HL,STACK        ; End of BUFFER RAM
         LD      SP,HL           ; Set up a temporary stack
-        JP      INITST          ; Go to initialise
+
+INITST: LD      A,0             ; Clear break flag
+        LD      (BRKFLG),A
 
 INIT:   LD      DE,INITAB       ; Initialise workspace
         LD      B,INITBE-INITAB+3; Bytes to copy
@@ -164,19 +172,16 @@ COPY:   LD      A,(DE)          ; Get source
         LD      (BUFFER+72+1),A ; Mark end of buffer
         LD      (PROGST),A      ; Initialise program area
 
-;MSIZE: LD      HL,MEMMSG       ; Point to message
-;       CALL    PRS             ; Output "Memory size"
-MSIZE:  LD      HL,(RAMSTART)   ; Read RAM end from memory
-        JP      SETTOP          ; Skip user input and mem check
-
+MSIZE:  LD      HL,MEMMSG       ; Point to message
+        CALL    PRS             ; Output "Memory size"
         CALL    PROMPT          ; Get input with '?'
         CALL    GETCHR          ; Get next character
         OR      A               ; Set flags
         JP      NZ,TSTMEM       ; If number - Test if RAM there
-        LD      HL,STLOOK       ; Point to start of RAM
-MLOOP:  INC     HL              ; Next byte
+        LD      HL,(STLOOK-1)&0FF00H ; Point to start of free
+MLOOP:  INC     H               ; Next 256 byte range
         LD      A,H             ; Above address FFFF ?
-        OR      L
+        OR      A
         JP      Z,SETTOP        ; Yes - 64K RAM
         LD      A,(HL)          ; Get contents
         LD      B,A             ; Save it
@@ -184,7 +189,7 @@ MLOOP:  INC     HL              ; Next byte
         LD      (HL),A          ; Put it back
         CP      (HL)            ; RAM there if same
         LD      (HL),B          ; Restore old contents
-        JP      Z,MLOOP         ; If RAM - test next byte
+        JP      Z,MLOOP         ; If RAM - test next ram section
         JP      SETTOP          ; Top of RAM found
 
 TSTMEM: CALL    ATOH            ; Get high memory into DE
@@ -235,7 +240,7 @@ BFREE:  .DB  " Bytes free",CR,LF,0,0
 SIGNON: .DB  "NASCOM ROM BASIC Ver 4.7b",CR,LF
         .DB  "Copyright (c) 1978 by Microsoft",CR,LF,0,0
 
-;MEMMSG: .DB  "Memory top",0
+MEMMSG: .DB  "Memory top",0
 
 ; FUNCTION ADDRESS TABLE
 
@@ -478,9 +483,9 @@ ERRORS: .DB     "NF"            ; NEXT without FOR
 ; INITIALISATION TABLE -------------------------------------------------------
 
 INITAB: JP      WARMST          ; Warm start jump
-        JP      FCERR           ; "USR (X)" jump (Set to Error)
+        JP      ITBRET          ; "USR (X)" jump -> RET
         OUT     (0),A           ; "OUT p,n" skeleton
-        RET
+ITBRET: RET
         SUB     0               ; Division support routine
         LD      L,A
         LD      A,H
@@ -503,9 +508,9 @@ INITAB: JP      WARMST          ; Warm start jump
         .DB     052H,0C7H,04FH,080H     ; Last random number
         IN      A,(0)           ; INP (x) skeleton
         RET
-        .DB     1               ; POS (x) number (1)
+        .DB     1               ; NULLS number (1)
         .DB     255             ; Terminal width (255 = no auto CRLF)
-        .DB     28              ; Width for commas (3 columns)
+        .DB     100             ; Width for commas -> 8 columns
         .DB     0               ; No nulls after input bytes
         .DB     0               ; Output enabled (^O off)
         .DW     20              ; Initial lines counter
@@ -905,24 +910,6 @@ ENDBUF: LD      HL,BUFFER-1     ; Point to start of buffer
         LD      (DE),A          ; A = 00
         RET
 
-        .if 0
-DODEL:  LD      A,(NULFLG)      ; Get null flag status
-        OR      A               ; Is it zero?
-        LD      A,0             ; Zero A - Leave flags
-        LD      (NULFLG),A      ; Zero null flag
-        JP      NZ,ECHDEL       ; Set - Echo it
-        DEC     B               ; Decrement length
-        JP      Z,GETLIN        ; Get line again if empty
-        CALL    OUTC            ; Output null character
-        .DB     3EH             ; Skip "DEC B"
-ECHDEL: DEC     B               ; Count bytes in buffer
-        DEC     HL              ; Back space buffer
-        JP      Z,OTKLN         ; No buffer - Try again
-        LD      A,(HL)          ; Get deleted byte
-        CALL    OUTC            ; Echo it
-        JP      MORINP          ; Get more input
-        .endif
-
 DELCHR: DEC     B               ; Count bytes in buffer
         DEC     HL              ; Back space buffer
         LD      A,BKSP
@@ -939,24 +926,9 @@ KILIN:  CALL    PRNTCRLF        ; Output CRLF
 GETLIN:
 TTYLIN: LD      HL,BUFFER       ; Get a line by character
         LD      B,1             ; Set buffer as empty
-        ;XOR     A
-        ;LD      (NULFLG),A      ; Clear null flag
 MORINP: CALL    CLOTST          ; Get character and test ^O
         LD      C,A             ; Save character in C
-        .if 0
-        CP      DEL             ; Delete character?
-        JP      Z,DODEL         ; Yes - Process it
-        LD      A,(NULFLG)      ; Get null flag
-        OR      A               ; Test null flag status
-        JP      Z,PROCES        ; Reset - Process character
-        LD      A,0             ; Set a null
-        CALL    OUTC            ; Output null
-        XOR     A               ; Clear A
-        LD      (NULFLG),A      ; Reset null flag
-        .endif
 PROCES: LD      A,C             ; Get character
-;        CP      CTRLG           ; Bell?
-;        JP      Z,PUTCTL        ; Yes - Save it
         CP      CTRLC           ; Is it control "C"?
         CALL    Z,PRNTCRLF      ; Yes - Output CRLF
         SCF                     ; Flag break
@@ -1000,10 +972,6 @@ PUTB1:  LD      A,C             ; Get character
         INC     B               ; Increment length
 OUTIT:  CALL    OUTC            ; Output the character entered
         JP      MORINP          ; Get another character
-
-;OUTNBS: CALL    OUTC            ; Output bell and back over it
-;        LD      A,BKSP          ; Set back space
-;        JP      OUTIT           ; Output it and get more
 
 CPDEHL: LD      A,H             ; Get H
         SUB     D               ; Compare with D
@@ -4328,20 +4296,12 @@ CHKBIN: INC     DE
 BINERR: LD      E,BN            ; ?BIN Error
         JP      ERROR
 
-
-JJUMP1: LD      IX,-1           ; Flag cold start
-        JP      CSTART          ; Go and initialise
-
 MONOUT: JP      0008H           ; output a char
 
 
 MONITR: HALT
         ;JP      0000H           ; Restart (Normally Monitor Start)
 
-
-INITST: LD      A,0             ; Clear break flag
-        LD      (BRKFLG),A
-        JP      INIT
 
 ARETN:  RETN                    ; Return from NMI
 
@@ -4356,5 +4316,17 @@ TSTBIT: PUSH    AF              ; Save bit mask
 OUTNCR: CALL    OUTC            ; Output character in A
         JP      PRNTCRLF        ; Output CRLF
 
-.end
+; *** USR ***
+; USR(X) jumps here, default USRJP at 0x2048 contains a jump to a RET code
+; Put the user function into ram - int16_t arg: DE, int16_t ret: DE
+; Put the function address into USRJP+1 (0x2049/0x204a = 8265/8266)
+USR:    CALL    DEINT           ; Get int16_t argument into DE
+        CALL    USRJP           ; Execute the user program
+        LD      A,D             ; int16_t result is returned in DE
+        LD      B,E             ; Move result to AB
+        CALL    ABPASS          ; Pass the result back to BASIC
+        RET
 
+        .DC     (ROMSIZE - $), 0
+
+.end
