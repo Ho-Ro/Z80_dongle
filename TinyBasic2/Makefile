@@ -9,7 +9,7 @@ all: $(H) $(HEX)
 
 .PHONY:	clean
 clean:
-	rm *.cim *.lst *.hex
+	rm -f *.cim *.lst *.hex
 
 
 ../Z80_dongle/TinyBasic2.h: tinybasic2_rom.cim obj2h

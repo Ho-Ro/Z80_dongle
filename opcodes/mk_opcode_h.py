@@ -29,7 +29,7 @@ def mkh( file, inc, pos ):
                     print()
         print( "};\n" );
 
-mkh( "opcode.txt",     "opcode",     0)
+mkh( "opcode.txt",     "opcode",     0 )
 mkh( "opcodeCB.txt",   "opcodeCB",   1 )
 mkh( "opcodeDD.txt",   "opcodeDD",   1 )
 mkh( "opcodeDDCB.txt", "opcodeDDCB", 2 )

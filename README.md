@@ -71,29 +71,34 @@ Connected through a serial port, you have several commands available (type `?` o
 at the console):
 
 ```
-  A               - analyse Grant Searle's ROM Basic
-  Ax              - analyse Hein Pragt's ROM Basic
-  B               - execute Grant Searle's ROM Basic
-  Bx              - execute Hein Pragt's ROM Basic
-  #               - show simulation variables
-  #N VALUE        - set simulation variable number N to a VALUE
-  #R              - reset simulation variables to their default values
-  R               - run the simulation from start 0x0000
-  S               - single-step the simulation from start 0x0000
-  C               - continue the simulation after halt
-  :INTEL-HEX      - reload RAM buffer with ihex data stream
-  .INTEL-HEX      - reload IO buffer with a modified ihex data stream
-  M START END     - dump the RAM buffer from START to END
-  MX START END    - dump the RAM buffer as ihex from START to END
-  MR              - reset the RAM buffer to 00
-  MS ADR B B B .. - set RAM buffer at ADR with data byte(s) B
-  I START END     - dump the IO buffer from START to END
-  IX START END    - dump the IO buffer as modified ihex from START to END
-  IR              - reset the IO buffer to 00
-  IS ADR B B B .. - set IO buffer at ADR with data byte(s) B
-  E0              - set echo off
-  E1              - set echo on (default)
-  VN              - set verboseMode to N (default = 0)
+A                - analyse Grant Searle's ROM Basic
+AT               - analyse Li Chen Wang's tiny ROM Basic
+AX               - analyse Hein Pragt's ROM Basic
+A1               - analyse 1K tiny Basic
+B                - execute Grant Searle's ROM Basic
+BT               - execute Li Chen Wang's tiny ROM Basic
+BX               - execute Hein Pragt's ROM Basic
+B1               - execute 1K tiny Basic
+X [DATA [STAT]]  - execute the RAM content, opt. data and status port
+R                - reset CPU, start the simulation at RAM address 0x0000
+C                - continue the simulation after halt
+:INTEL-HEX       - reload RAM buffer with ihex data stream
+.INTEL-HEX       - reload IO buffer with a modified ihex data stream
+M [START [END]]  - dump the RAM buffer from START to END
+MA [START [END]] - dump the RAM buffer from START to END (with ASCII)
+MX [START [END]] - dump the RAM buffer as ihex from START to END
+MR               - reset the RAM buffer to 00
+MS ADR B B B ..  - set RAM buffer at ADR with data byte(s) B
+I [START [END]]  - dump the IO buffer from START to END
+IX [START [END]] - dump the IO buffer as modified ihex from START to END
+IR               - reset the IO buffer to 00
+IS ADR B B B ..  - set IO buffer at ADR with data byte(s) B
+#                - show simulation variables
+#x VALUE         - set simulation variable x to a VALUE
+##               - reset simulation variables to their default values
+E0               - set echo off
+E1               - set echo on (default)
+VN               - set verboseMode to N (default = 0)
 ```
 
 There are several internal simulation variables that you can change in order to run your tests
@@ -220,9 +225,8 @@ Using RAM range [0x0000...0x0069]
 ```
 </details>
 
-Open an Intel-style hex file
-that will show the code in hex; copy all and paste it into the Arduino serial terminal.
-You can paste IHEX files up to 768 byte, this is enough for 256 byte program code.
+Open an Intel-style hex file that will show the code in hex;
+copy all and paste it into the serial terminal.
 
 ```
 :200000002116003100013E55770E55ED713E00ED47ED5EFB18FE00000000000000000000DE
@@ -265,60 +269,59 @@ mx 0 80
 :00000001FF
 ```
 
-Typing command `s` will show simulation variables that are available to us:
+Typing command `#` will show simulation variables that are available to us:
 
 ```
-s
------- Simulation variables ------
-#0  Trace both clock phases  =    0
-#1  Trace refresh cycles     =    1
-#2  Pause for keypress every =    100
-#3  Stop after clock #       =   -1
-#4  Stop after M1 cycle #    =   -1
-#5  Stop at HALT             =    1
-#6  Issue INT at clock #     =   -1
-#7  Issue NMI at clock #     =   -1
-#8  Issue BUSRQ at clock #   =   -1
-#9  Issue RESET at clock #   =   -1
-#10 Issue WAIT at clock #    =   -1
-#11 Clear all at clock #     =   -1
-#12 Push IORQ vector #(hex)  =   FF
-#13 Pause at M1 at #(hex)    = 0000
+ #
+  ------ Simulation variables --------
+  ##  Reset simulation variables to default
+  #L  Trace also Low clock       =    0
+  #F  Trace reFresh cycles       =    1
+  #K  Pause for Keypress every # =  100
+  #A  Pause at M1 Addr. #(hex)   = 0000
+  #C  Stop after Clock #         =   -1
+  #M  Stop after M1 cycle #      =   -1
+  #H  Stop at HALT               =    1
+  #V  IORQ vector #(hex)         =   FF
+  #I  INT at clock #             =   -1   -1
+  #N  NMI at clock #             =   -1   -1
+  #B  BUSRQ at clock #           =   -1   -1
+  #R  RESET at clock #           =   -1   -1
+  #W  WAIT at clock #            =   -1   -1
+  #-  Clear all at clock #       =   -1
 ```
-
-The code evolved over time and so did the variables and multitudes of situations that can
-be set up by cleverly combining those values. In fact, this blog probably does not show
-the most up-to-date software version.
 
 As it runs, the trace program counts clocks and, by setting those variables, you can toggle
 specific control pins at determined times. For example, if you want to issue an INT at clock 120,
-you would do `s 6 120`. You can optionally dump what's happening on both clock phases and not
-only on the positive phase (variable #0). Variable #1 will show or hide memory refresh cycles
-that accompany M1.
+and release it at clock 130 you would do `#I 120 130`.You can optionally dump what's happening on both clock phases and not
+only on the positive phase (variable #L).
+Variable #F will show or hide memory refresh cycles that accompany M1.
 
 ```
-s 6 120
------- Simulation variables ------
-#0  Trace both clock phases  =    0
-#1  Trace refresh cycles     =    1
-#2  Pause for keypress every =    0
-#3  Stop after clock #       =   200
-#4  Stop after M1 cycle #    =   -1
-#5  Stop at HALT             =    1
-#6  Issue INT at clock #     =   120
-#7  Issue NMI at clock #     =   -1
-#8  Issue BUSRQ at clock #   =   -1
-#9  Issue RESET at clock #   =   -1
-#10 Issue WAIT at clock #    =   -1
-#11 Clear all at clock #     =   130
-#12 Push IORQ vector #(hex)  =   30
-#13 Pause at M1 at #(hex)    = 0000
+ #I 120 130
+  ------ Simulation variables --------
+  ##  Reset simulation variables to default
+  #L  Trace also Low clock       =    0
+  #F  Trace reFresh cycles       =    1
+  #K  Pause for Keypress every # =  200
+  #A  Pause at M1 Addr. #(hex)   = 0000
+  #C  Stop after Clock #         =   -1
+  #M  Stop after M1 cycle #      =   -1
+  #H  Stop at HALT               =    1
+  #V  IORQ vector #(hex)         =   30
+  #I  INT at clock #             =  120  130
+  #N  NMI at clock #             =   -1   -1
+  #B  BUSRQ at clock #           =   -1   -1
+  #R  RESET at clock #           =   -1   -1
+  #W  WAIT at clock #            =   -1   -1
+  #-  Clear all at clock #       =   -1
 ```
 
-The program will run for 200 clock cycles (`s 3 200`), issue an interrupt at clock 120 (`s 6 120`),
-clear it at clock 130 (`s 11 130`)and will push 0x30 (`s12 30`) at int vector request (M1 = low & IORQ = low).
-Start the trace by issuing a command `r`. The Arduino starts the clocks and issues a RESET
-sequence to Z80 after which your code runs and bus values are dumped out.
+The program will run for 200 clock cycles (`#K 200`), issue an interrupt at clock 120,
+clear it at clock 130 (`#I 120 130`) and will push 0x30 (`#V 30`) at int vector request
+(M1 = low & IORQ = low). Start the trace by issuing a command `r`.
+The Arduino starts the clocks and issues a RESET sequence to Z80 after which your code
+runs and bus values are dumped out.
 
 Notice the tri-state detection – when the address or data bus is being tri-stated by Z80,
 the program outputs `–`. In fact, the data bus is being tri-stated most of the time!
@@ -926,12 +929,12 @@ OK
 This little code line uses my HW extensions to hex-dump the content of the program memory.
 
 ```
->10 for a=txt to top-size-1; print #4,%16,get(a),; next a
+>10 for a=$900 to top-size-1; print #4,%16,get(a),; next a
 >run
-   $A  $0 $66 $6F $72 $20 $61 $3D $74 $78 $74 $20 $74 $6F $20 $74
-  $6F $70 $2D $73 $69 $7A $65 $2D $31 $3B $20 $70 $72 $69 $6E $74
-  $20 $23 $34 $2C $25 $31 $36 $2C $67 $65 $74 $28 $61 $29 $2C $3B
-  $20 $6E $65 $78 $74 $20 $61  $D
+   $A  $0 $66 $6F $72 $20 $61 $3D $24 $39 $30 $30 $20 $74 $6F $20
+  $74 $6F $70 $2D $73 $69 $7A $65 $2D $31 $3B $20 $70 $72 $69 $6E
+  $74 $20 $23 $34 $2C $25 $31 $36 $2C $67 $65 $74 $28 $61 $29 $2C
+  $3B $20 $6E $65 $78 $74 $20 $61  $D
 OK
 ```
 
@@ -939,15 +942,15 @@ Each line starts with the line number stored as int16_t followed by the unchange
 To save space commands can be abbreviated with a full stop (and become almost unreadable).
 
 ```
->10 f.a=t.t.top-s.-1;p.#4,%16,g.(a),;n.a
+>10 f.a=$900 t.t.-s.-1;p.#4,%16,g.(a),;n.a
 >run
-   $A  $0 $66 $2E $61 $3D $74 $2E $74 $2E $74 $6F $70 $2D $73 $2E
-  $2D $31 $3B $70 $2E $23 $34 $2C $25 $31 $36 $2C $67 $2E $28 $61
-  $29 $2C $3B $6E $2E $61  $D
+   $A  $0 $66 $2E $61 $3D $24 $39 $30 $30 $20 $74 $2E $74 $2E $2D
+  $73 $2E $2D $31 $3B $70 $2E $23 $34 $2C $25 $31 $36 $2C $67 $2E
+  $28 $61 $29 $2C $3B $6E $2E $61  $D
 OK
 ```
 
-Depending on the context `t.` could either be the constant `txt` or the statement `to`,
+Depending on the context `t.` could either be the constant `top` or the statement `to`,
 same for `get()` and `goto`.
 
 This part puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it via the funtion `USR(123)`.
@@ -961,6 +964,8 @@ OK
 
 OK
 ```
+
+To exit Tiny Basic execute `HALT`, this halts the Z80 CPU and exits to the analyser loop.
 
 ## Nascom ROM Basic
 
@@ -979,16 +984,26 @@ My 1st computer back in 1980 was a [Nascom 2 kit](https://en.wikipedia.org/wiki/
 [Z80 retroshield project](https://github.com/skx/z80retroshield/tree/master/examples/basic).
 
 ```
-Z80 SBC By Grant Searle
-
 Memory top?
-Z80 BASIC Ver 4.7b
-Copyright (C) 1978 by Microsoft
-6270 Bytes free
+NASCOM ROM BASIC Ver 4.7b
+Copyright (c) 1978 by Microsoft
+6339 Bytes free
 Ok
 ```
 
 This Basic is based on the Nascom Rom Basic and was adapted by [Grant Searle](http://searle.x10host.com/z80/SimpleZ80.html#RomBasic).
-The slightly modified source can be assembled with the [uz80as](https://github.com/jorgicor/uz80as).
+The slightly modified source can be assembled with the `zmac` assembler.
 
 It can be started with the command `B`.
+
+To exit Nascom ROM Basic execute `MONITOR`, this halts the Z80 CPU and exits to the analyser loop.
+
+## 1K Tiny BASIC
+
+[Will Stevens' basic1K](https://github.com/WillStevens/basic1K) is the smallest Basic for Z80 processors,
+it fits into 1K ROM. It has similar features as the original tiny Basic, i.e. only ´int16_t´ arithmetic,
+26 variables `A` to `Z`, functions `ABS()`, `PEEK()`, `RND()`, and `USR()`, but a key difference is that
+1K Tiny BASIC is tokenised rather than being parsed at run-time, so it executes faster.
+Will's source code can be assembled with `zmac` (after some reformatting), ´basic1K´ can be started with `B1`.
+`basic1K` has no command to exit, but you can type e.g. `LET A=118 LET A=USR(1026)`, this puts 0x76 (Z80 `HALT`)
+at address 1026 and calls address 1026. The `HALT` command halts the Z80 and exits to the analyser loop.

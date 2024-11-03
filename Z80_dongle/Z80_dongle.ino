@@ -642,20 +642,21 @@ int controlHandler() {
                 }
             }
             pf( F( "  ------ Simulation variables --------\r\n" ) );
-            pf( F( "  #L  Trace also Low clock     = %4d\r\n" ), traceAlsoLowPhase );
-            pf( F( "  #F  Trace reFresh cycles     = %4d\r\n" ), traceRefresh );
-            pf( F( "  #K  Pause for keypress every = %4d\r\n" ), tracePause );
-            pf( F( "  #A  Pause at M1 Addr. #(hex  = %04X\r\n" ), pauseAddress );
-            pf( F( "  #C  Stop after Clock #       = %4d\r\n" ), stopAtClk );
-            pf( F( "  #M  Stop after M1 cycle #    = %4d\r\n" ), stopAtM1 );
-            pf( F( "  #H  Stop at HALT             = %4d\r\n" ), stopAtHalt );
-            pf( F( "  #V  IORQ vector #(hex)       =   %02X\r\n" ), iorqVector );
-            pf( F( "  #I  INT at clock #           = %4d %4d\r\n" ), intAtClk, intOffAtClk );
-            pf( F( "  #N  NMI at clock #           = %4d %4d\r\n" ), nmiAtClk, nmiOffAtClk );
-            pf( F( "  #B  BUSRQ at clock #         = %4d %4d\r\n" ), busrqAtClk, busrqOffAtClk );
-            pf( F( "  #R  RESET at clock #         = %4d %4d\r\n" ), resetAtClk, resetOffAtClk );
-            pf( F( "  #W  WAIT at clock #          = %4d %4d\r\n" ), waitAtClk, waitOffAtClk );
-            pf( F( "  #-  Clear all at clock #     = %4d\r\n" ), clearAtClk );
+            pf( F( "  ##  Reset simulation variables to default\r\n" ) );
+            pf( F( "  #L  Trace also Low clock       = %4d\r\n" ), traceAlsoLowPhase );
+            pf( F( "  #F  Trace reFresh cycles       = %4d\r\n" ), traceRefresh );
+            pf( F( "  #K  Pause for Keypress every # = %4d\r\n" ), tracePause );
+            pf( F( "  #A  Pause at M1 Addr. #(hex)   = %04X\r\n" ), pauseAddress );
+            pf( F( "  #C  Stop after Clock #         = %4d\r\n" ), stopAtClk );
+            pf( F( "  #M  Stop after M1 cycle #      = %4d\r\n" ), stopAtM1 );
+            pf( F( "  #H  Stop at HALT               = %4d\r\n" ), stopAtHalt );
+            pf( F( "  #V  IORQ vector #(hex)         =   %02X\r\n" ), iorqVector );
+            pf( F( "  #I  INT at clock #             = %4d %4d\r\n" ), intAtClk, intOffAtClk );
+            pf( F( "  #N  NMI at clock #             = %4d %4d\r\n" ), nmiAtClk, nmiOffAtClk );
+            pf( F( "  #B  BUSRQ at clock #           = %4d %4d\r\n" ), busrqAtClk, busrqOffAtClk );
+            pf( F( "  #R  RESET at clock #           = %4d %4d\r\n" ), resetAtClk, resetOffAtClk );
+            pf( F( "  #W  WAIT at clock #            = %4d %4d\r\n" ), waitAtClk, waitOffAtClk );
+            pf( F( "  #-  Clear all at clock #       = %4d\r\n" ), clearAtClk );
             break;
 
         case 'M':   // memory
@@ -790,9 +791,11 @@ int controlHandler() {
             pf( F( "A                - analyse Grant Searle's ROM Basic\r\n" ) );
             pf( F( "AT               - analyse Li Chen Wang's tiny ROM Basic\r\n" ) );
             pf( F( "AX               - analyse Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "A1               - analyse 1K tiny Basic\r\n" ) );
             pf( F( "B                - execute Grant Searle's ROM Basic\r\n" ) );
             pf( F( "BT               - execute Li Chen Wang's tiny ROM Basic\r\n" ) );
             pf( F( "BX               - execute Hein Pragt's ROM Basic\r\n" ) );
+            pf( F( "B1               - execute 1K tiny Basic\r\n" ) );
             pf( F( "X [DATA [STAT]]  - execute the RAM content, opt. data and status port\r\n" ) );
             pf( F( "R                - reset CPU, start the simulation at RAM address 0x0000\r\n" ) );
             pf( F( "C                - continue the simulation after halt\r\n" ) );
@@ -808,8 +811,8 @@ int controlHandler() {
             pf( F( "IR               - reset the IO buffer to 00\r\n" ) );
             pf( F( "IS ADR B B B ..  - set IO buffer at ADR with data byte(s) B\r\n" ) );
             pf( F( "#                - show simulation variables\r\n" ) );
-            pf( F( "#N VALUE         - set simulation variable number N to a VALUE\r\n" ) );
-            pf( F( "#R               - reset simulation variables to their default values\r\n" ) );
+            pf( F( "#x VALUE         - set simulation variable x to a VALUE\r\n" ) );
+            pf( F( "##               - reset simulation variables to their default values\r\n" ) );
             pf( F( "E0               - set echo off\r\n" ) );
             pf( F( "E1               - set echo on (default)\r\n" ) );
             pf( F( "VN               - set verboseMode to N (default = 0)\r\n" ) );
@@ -1309,20 +1312,20 @@ ISR( INT2_vect ) { // Handle RD
         } else { // ROM read
             DATA_PUT( pgm_read_byte( ROM + (uint16_t)( ADDR_LO | ( ADDR_HI << 8 ) ) ) );
         }
-    } else if ( zIORQ ) {     // Handle IORQ - Simulate 6850 at addresses 1 and 2
+    } else if ( zIORQ ) {              // Handle IORQ - Simulate 6850 at addresses 1 and 2
         if ( ADDR_LO == ioDataPort ) { // Port 1 returns character from keyboard
             if ( Serial.available() == 0 ) {
                 DATA_PUT( 0 );
-            } else {
+            } else { // cmd 'B' or 'X' in upper case -> make all kbd input upper case
                 DATA_PUT( islower( cmd ) ? (char)Serial.read() : toupper( (char)Serial.read() ) );
             }
         } else if ( ADDR_LO == ioStatPort ) { // Port 2 returns bit 0 set if a key has been pressed.
-            if ( Serial.available() > 0 ) {
+            if ( Serial.available() > 0 ) {   // Bit 1 is always 1 (Transmit Data Register Empty)
                 DATA_PUT( 0x03 ); // RDRF=1, TDRE=1
             } else {
                 DATA_PUT( 0x02 ); // RDRF=0, TDRE=1
             }
-        } else             // other ports
+        } else             // Other ports
             DATA_PUT( 0 ); // Otherwise, it returns 0
     }
     WAIT_HIGH();

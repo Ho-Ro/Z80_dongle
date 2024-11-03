@@ -79,7 +79,7 @@ LINEAT  .ds     2       ; .EQU   WRKSPC + 5CH    ; Current line number
 BASTXT  .ds     2       ; .EQU   WRKSPC + 5EH    ; Pointer to start of program
         .ds     1
 BUFFER  .ds     74      ; .EQU   WRKSPC + 61H    ; Input buffer
-STACK   .EQU   WRKSPC + 66H    ; Initial stack
+STACK   .equ    BUFFER+70 ;.EQU   WRKSPC + 66H   ; Initial stack
 CURPOS  .ds     1       ; .EQU   WRKSPC + 0ABH   ; Character position on line
 LCRFLG  .ds     1       ; .EQU   WRKSPC + 0ACH   ; Locate/Create flag
 TYPE    .ds     1       ; .EQU   WRKSPC + 0ADH   ; Data type flag
@@ -148,8 +148,8 @@ WARM:   JP      WARMST          ; Jump for warm start
 ; Get the int16_t argument in DE by calling DEINT.
 ; Put return int16_t value in AB and call ABPASS.
 ;
-        JP     DEINT            ; Get int16_t argument in DE
-        JP     ABPASS           ; Return int16_t result in AB
+        JP      DEINT           ; Get int16_t argument in DE
+        JP      ABPASS          ; Return int16_t result in AB
 
 CSTART: LD      HL,STACK        ; End of BUFFER RAM
         LD      SP,HL           ; Set up a temporary stack
@@ -158,7 +158,7 @@ INITST: LD      A,0             ; Clear break flag
         LD      (BRKFLG),A
 
 INIT:   LD      DE,INITAB       ; Initialise workspace
-        LD      B,INITBE-INITAB+3; Bytes to copy
+        LD      B,INITBE-INITAB+3 ; Bytes to copy
         LD      HL,WRKSPC       ; Into workspace RAM
 COPY:   LD      A,(DE)          ; Get source
         LD      (HL),A          ; To destination
@@ -1009,7 +1009,7 @@ INCLEN: INC     A               ; Move on one character
         LD      (CURPOS),A      ; Save new position
 DINPOS: POP     AF              ; Restore character
         POP     BC              ; Restore buffer length
-        CALL    MONOUT          ; Send it
+        CALL    CHROUT          ; Send it
         RET
 
 CLOTST: CALL    GETINP          ; Get input character
@@ -1238,9 +1238,9 @@ UPDATA: LD      (NXTDAT),HL     ; Update DATA pointer
         RET
 
 
-TSTBRK: RST     18H             ; Check input status
+TSTBRK: CALL    CHKIN           ; Check input status
         RET     Z               ; No key, go back
-        RST     10H             ; Get the key into A
+        CALL    CHRIN           ; Get the key into A
         CP      ESC             ; Escape key?
         JR      Z,BRK           ; Yes, break
         CP      CTRLC           ; <Ctrl-C>
@@ -1249,9 +1249,9 @@ TSTBRK: RST     18H             ; Check input status
         RET     NZ              ; Other key, ignore
 
 
-STALL:  RST     10H             ; Wait for key
+STALL:  CALL    CHRIN           ; Wait for key
         CP      CTRLQ           ; Resume scrolling?
-        RET      Z              ; Release the chokehold
+        RET     Z              ; Release the chokehold
         CP      CTRLC           ; Second break?
         JR      Z,STOP          ; Break during hold exits prog
         JR      STALL           ; Loop until <Ctrl-Q> or <brk>
@@ -4087,12 +4087,12 @@ ATNTAB: .DB  9                       ; Table used by ATN
 
 ARET:   RET                     ; A RETurn instruction
 
-GETINP: RST     10H             ;input a character
+GETINP: CALL    CHRIN           ;input a character
         RET
 
 CLS: 
         LD      A,CS            ; ASCII Clear screen
-        JP      MONOUT          ; Output character
+        JP      CHROUT          ; Output character
 
 WIDTH:  CALL    GETINT          ; Get integer 0-255
         LD      A,E             ; Width to A
@@ -4296,7 +4296,7 @@ CHKBIN: INC     DE
 BINERR: LD      E,BN            ; ?BIN Error
         JP      ERROR
 
-MONOUT: JP      0008H           ; output a char
+;MONOUT: JP      0008H           ; output a char
 
 
 MONITR: HALT
@@ -4326,6 +4326,18 @@ USR:    CALL    DEINT           ; Get int16_t argument into DE
         LD      B,E             ; Move result to AB
         CALL    ABPASS          ; Pass the result back to BASIC
         RET
+
+
+
+CHROUT: RST     08H
+        RET
+
+CHRIN:  RST     10H
+        RET
+
+CHKIN:  RST     18H
+        RET
+
 
         .DC     (ROMSIZE - $), 0
 
