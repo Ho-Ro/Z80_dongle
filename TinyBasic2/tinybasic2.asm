@@ -18,7 +18,7 @@
 ; Hex numbers: $xxxx
 ; 2024-10-13 Ho-Ro:
 ; build ROM version (2K ROM / 6.5K RAM) and RAM version (2K prog RAM / 2K free RAM)
-; add command "HALT" (halts Z80, returns to dongle analyser program)
+; add command "BYE" (halts Z80, returns to dongle analyser program)
 ; 2024-10-15 Ho-Ro:
 ; PRINT modifier %nn switches to unsigned number format, e.g.:
 ; PRINT %10,$FFFF -> 65535
@@ -30,7 +30,8 @@
 ; Changed to the more authentic zmac syntax (https://github.com/gp48k/zmac)
 ; 2024-10-30 Ho-Ro:
 ; add operator '|' and '&'; remove RAM and TXT; 2044 bytes
-
+; 2024-11-03 Ho-Ro:
+; replace JP -> JR, add function CALL(ADR), add char constant 'x', 2047 bytes
 ; *************************************************************
 ;
 ;                 TINY BASIC FOR INTEL 8080
@@ -103,14 +104,17 @@ TSTC            .MACRO   CHAR,LABEL
                 .ORG    ROMBGN
 
 CSTART:         LD      SP,STACK        ; *** COLD START ***
-                LD      A,0             ; must be 2 byte
+                XOR     A               ; must be 2 byte
                 JP      INIT            ; as delimiter for PRTSTG
+                .DB     "L"             ; FILL ONE BYTE
 
 
 RTSTC:          EX      (SP),HL         ; *** RST 1 @ $0008 ***
                 RST     RIGNBLK         ; IGNORE BLANKS AND
                 CP      (HL)            ; TEST CHARACTER
-                JP      TC1             ; REST OF THIS IS AT TC1
+                INC     HL              ; COMPARE THE FOLLOWING BYTE
+                JR      TC1             ; REST OF THIS IS AT TC1
+
 
 CRLF:           LD      A,CR            ; *** CRLF ***
                                         ; *** RST 2 @ $0010 ***
@@ -123,7 +127,7 @@ ROUTC:          OUT     (IODATA),A      ; Out to data port
 REXPR:          CALL    EXPR2           ; *** RST 3 @ $0018 ***
                 PUSH    HL              ; EVALUATE AN EXPRESSION
                 JP      EXPR1           ; REST OF IT AT EXPR1
-                .DB     "W"             ; FILL ONE BYTE
+                .DB     "C"             ; FILL ONE BYTE
 
 
 RCOMP:          LD      A,H             ; *** RST 4 @ $0020 ***
@@ -132,14 +136,15 @@ RCOMP:          LD      A,H             ; *** RST 4 @ $0020 ***
                 LD      A,L             ; Z FLAGS
                 CP      E               ; BUT OLD A IS LOST
                 RET
-                .DB     "AN"            ; FILL TWO BYTES
+                .DB     "WA"            ; FILL TWO BYTES
 
 
 RIGNBLK:        LD      A,(DE)          ; *** RST 5 @ $0028 ***
                 CP      20H             ; IGNORE BLANKS
                 RET     NZ              ; IN TEXT (WHERE DE->)
                 INC     DE              ; AND RETURN THE FIRST
-                JP      RIGNBLK         ; NON-BLANK CHAR. IN A
+                JR      RIGNBLK         ; NON-BLANK CHAR. IN A
+                .DB     "N"             ; FILL ONE BYTE
 
 
 RFINISH:        POP     AF              ; *** RST 6 @ $0030 ***
@@ -151,7 +156,7 @@ RFINISH:        POP     AF              ; *** RST 6 @ $0030 ***
 RTSTV:          RST     RIGNBLK         ; *** RST 7 @ $0038 ***
                 SUB     '@'             ; TEST VARIABLES
                 RET     C               ; C: < '@', NOT A VARIABLE
-                JP      NZ,TV1          ; NZ: NOT THE '@' ARRAY
+                JR      NZ,TV1          ; NZ: NOT THE '@' ARRAY
 ;
                 INC     DE              ; IT IS THE "@" ARRAY
                 CALL    PARN            ; @ SHOULD BE FOLLOWED
@@ -189,10 +194,10 @@ TV2:            CP      1BH             ; <='Z'
 ; TSTC:         EX      (SP),HL         ; *** TSTC OR RST 1 ***
 ;               RST     RIGNBLK         ; THIS IS AT LOC. 8
 ;               CMP     (HL)            ; AND THEN JUMP HERE
-;               JP      TC1             ; REST OF THIS IS AT TC1
+;               INC     HL              ; COMPARE THE FOLLOWING BYTE
+;               JR      TC1             ; REST OF THIS IS AT TC1
 ;
-TC1:            INC     HL              ; COMPARE THE BYTE THAT
-                JR      Z,TC2           ; FOLLOWS THE RST INST.
+TC1:            JR      Z,TC2           ; FOLLOWS THE RST INST.
                 PUSH    BC              ; WITH THE TEXT (DE->)
                 LD      C,(HL)          ; IF NOT =, ADD THE 2ND
                 LD      B,0             ; BYTE THAT FOLLOWS THE
@@ -205,10 +210,22 @@ TC2:            INC     DE              ; IF =, SKIP THOSE BYTES
                 RET
 
 TSTNUM:         LD      HL,0            ; *** TSTNUM ***
-                LD      B,H             ; TEST IF THE TEXT IS
-                RST     RIGNBLK         ; A NUMBER
+                LD      B,H             ; TEST IF THE TEXT IS A NUMBER
+                RST     RIGNBLK         ; Skip spaces
                 CP      '$'             ; HEX NUMBER?
                 JR      Z,TX1           ; YES
+                CP      "'"             ; Is it a char constant?
+                JR      NZ,TN1          ; No, check if normal number
+                INC     DE              ; Skip "'"
+                LD      A,(DE)          ; Get one char
+                LD      L,A             ;
+                INC     DE              ; Skip the char
+                LD      A,(DE)
+                CP      "'"             ; Closing "'"?
+                JR      NZ,WHAT         ; No -> syntax error
+                INC     DE              ; Skip the "'"
+                INC     B               ; Min. 1 digit
+                RET
 TN1:            CP      '0'             ; IF NOT, RETURN 0 IN
                 RET     C               ; B AND HL
                 CP      '9'+1           ; IF NUMBERS, CONVERT
@@ -271,7 +288,7 @@ QHOW:           PUSH    DE              ; *** ERROR "HOW?" ***
 AHOW:           LD      DE,HOW
                 JP      ERROR
 
-TIBAS:          .DB     "TinyBASIC"
+TIBAS:          .DB     "TB2"; "TinyBASIC2"
                 .DB     CR
 
 HOW:            .DB     "HOW?"
@@ -551,7 +568,7 @@ GOTO:           RST     REXPR           ; *** GOTO EXPR ***
 ; PRINTED OR IF THE LIST IS A NULL LIST.  HOWEVER IF THE LIST
 ; ENDED WITH A COMMA, NO (CRLF) IS GENERATED.
 ;
-LIST_:          CALL    TSTNUM          ; TEST IF THERE IS A #
+LIST:           CALL    TSTNUM          ; TEST IF THERE IS A #
                 CALL    ENDCHK          ; IF NO # WE GET A 0
                 CALL    FNDLN           ; FIND THIS OR NEXT LINE
 LS1:            JP      C,WSTART        ; C:PASSED TXTUNF
@@ -560,15 +577,15 @@ LS1:            JP      C,WSTART        ; C:PASSED TXTUNF
                 CALL    FNDLP           ; FIND NEXT LINE
                 JR      LS1             ; AND LOOP BACK
 
-PRINT:          LD      C,8             ; C = # OF SPACES
-                XOR     A               ; DEFAULT BASE FOR PRTNUM
+PRINT:          XOR     A               ; DEFAULT BASE FOR PRTNUM
                 LD      (PNBASE),A
+                LD      C,8             ; C = # OF SPACES
                 TSTC    ';',PR2         ; IF NULL LIST & ";"
                 CALL    CRLF            ; GIVE CR-LF AND
-                JP      RUNSML          ; CONTINUE SAME LINE
+                JR      RUNSML          ; CONTINUE SAME LINE
 PR2:            TSTC    CR,PR0          ; IF NULL LIST (CR)
                 CALL    CRLF            ; ALSO GIVE CR-LF AND
-                JP      RUNNXL          ; GO TO NEXT LINE
+                JR      RUNNXL          ; GO TO NEXT LINE
 PR0:            TSTC    '#',PR5         ; ELSE IS IT FORMAT?
                 RST     REXPR           ; YES, EVALUATE EXPR.
                 LD      C,L             ; AND SAVE IT IN C
@@ -583,7 +600,7 @@ PR5:            TSTC    '%',PR1         ; ELSE IS IT PRTNUM BASE?
                 LD      (PNBASE),A      ; IN PNBASE
                 JR      PR3             ; LOOK FOR MORE TO PRINT
 PR1:            CALL    QTSTG           ; OR IS IT A STRING?
-                JP      PR8             ; HACK JP!! IF NOT, MUST BE EXPR.
+                JR      PR8             ; HACK JR!! IF NOT, MUST BE EXPR.
 PR3:            TSTC    $2C,PR6         ; IF ",", GO FIND NEXT
                 CALL    FIN             ; IN THE LIST.
                 JR      PR0             ; LIST CONTINUES
@@ -625,8 +642,8 @@ GOSUB:          CALL    PUSHA           ; SAVE THE CURRENT "FOR"
                 PUSH    HL              ; 'CURRNT' OLD 'STKGOS'
                 LD      HL,(STKGOS)
                 PUSH    HL
-                LD      HL,0            ; AND LOAD NEW ONES
-                LD      (LOPVAR),HL
+                SBC     HL,HL           ; CY=0, shorter than LD HL,0
+                LD      (LOPVAR),HL     ; LOAD NEW ONES
                 ADD     HL,SP
                 LD      (STKGOS),HL
                 JP      RUNTSL          ; THEN RUN THAT LINE
@@ -833,7 +850,7 @@ INPERR:         LD      HL,(STKINP)     ; *** INPERR ***
 INPUT:                                  ; *** INPUT ***
 IP1:            PUSH    DE              ; SAVE IN CASE OF ERROR
                 CALL    QTSTG           ; IS NEXT ITEM A STRING?
-                JP      IP2             ; HACK JP!! NO
+                JR      IP2             ; HACK JR!! NO
                 RST     RTSTV           ; YES, BUT FOLLOWED BY A
                 JR      C,IP4           ; VARIABLE?   NO.
                 JR      IP3             ; YES.  INPUT VARIABLE
@@ -897,9 +914,9 @@ LT1:            RST     RFINISH         ; UNTIL FINISH
 ;         <EXPR2><REL.OP.><EXPR2>
 ; WHERE <REL.OP.> IS ONE OF THE OPERATORS IN TAB8 AND THE
 ; RESULT OF THESE OPERATIONS IS 1 IF TRUE AND 0 IF FALSE.
-; <EXPR2>::=(+ OR -)<EXPR3>(+ OR -<EXPR3>)(....)
+; <EXPR2>::=(+ OR -)<EXPR3>(+ OR - OR |<EXPR3>)(....)
 ; WHERE () ARE OPTIONAL AND (....) ARE OPTIONAL REPEATS.
-; <EXPR3>::=<EXPR4>(* OR /><EXPR4>)(....)
+; <EXPR3>::=<EXPR4>(* OR / OR &<EXPR4>)(....)
 ; <EXPR4>::=<VARIABLE>
 ;           <FUNCTION>
 ;           (<EXPR>)
@@ -914,37 +931,37 @@ LT1:            RST     RFINISH         ; UNTIL FINISH
 EXPR1:          LD      HL,TAB8-1       ; LOOKUP REL.OP.
                 JP      EXEC            ; GO DO IT
 ;
-XP11:           CALL    XP18            ; REL.OP.">="
-                RET     C               ; NO, RETURN HL=0
-                LD      L,A             ; YES, RETURN HL=1
+XPEQ:           CALL    XP18            ; REL.OP."="
+                RET     NZ              ; FALSE, RETURN HL=0
+                LD      L,A             ; ELSE SET HL=1
                 RET
 ;
-XP12:           CALL    XP18            ; REL.OP."#" OR "<>" OR "!="
+XPNE:           CALL    XP18            ; REL.OP."#" OR "<>"
                 RET     Z               ; FALSE, RETURN HL=0
                 LD      L,A             ; TRUE, RETURN HL=1
                 RET
 ;
-XP13:           CALL    XP18            ; REL.OP.">"
-                RET     Z               ; FALSE
-                RET     C               ; ALSO FALSE, HL=0
-                LD      L,A             ; TRUE, HL=1
-                RET
-;
-XP14:           CALL    XP18            ; REL.OP."<="
+XPLE:           CALL    XP18            ; REL.OP."<="
                 LD      L,A             ; SET HL=1
                 RET     Z               ; REL. TRUE, RETURN
                 RET     C
                 LD      L,H             ; ELSE SET HL=0
                 RET
 ;
-XP15:           CALL    XP18            ; REL.OP."=" OR "=="
-                RET     NZ              ; FALSE, RETURN HL=0
+XPLT:           CALL    XP18            ; REL.OP."<"
+                RET     NC              ; FALSE, RETURN HL=0
                 LD      L,A             ; ELSE SET HL=1
                 RET
 ;
-XP16:           CALL    XP18            ; REL.OP."<"
-                RET     NC              ; FALSE, RETURN HL=0
-                LD      L,A             ; ELSE SET HL=1
+XPGE:           CALL    XP18            ; REL.OP.">="
+                RET     C               ; NO, RETURN HL=0
+                LD      L,A             ; YES, RETURN HL=1
+                RET
+;
+XPGT:           CALL    XP18            ; REL.OP.">"
+                RET     Z               ; FALSE
+                RET     C               ; ALSO FALSE, HL=0
+                LD      L,A             ; TRUE, HL=1
                 RET
 ;
 XP17:           POP     HL              ; NOT .REL.OP
@@ -1153,6 +1170,10 @@ USR:            CALL    PARN            ; *** USR(PARA) ***
 ;               RET                     ; $C9 - RET to BASIC
 ;                                       ; DEFAULT: (USRSPC)=$C9
 
+CALL:           CALL    PARN            ; *** CALL(ADR) ***
+                JP      (HL)            ; Get address in HL and jump there
+                                        ; Return value in HL
+
 TOP:            LD      HL,TXTEND       ; *** TOP *** END OF TEXT AREA = USRSPC
                 RET
 
@@ -1170,9 +1191,9 @@ PT0:            RST     REXPR           ; GET VAL IN HL
 ;
 PT1:            RST     RFINISH         ; READY
 ;
-PT2:            JP      QWHAT           ; ELSE SAY: "WHAT?"
+PT2:            JR      QWHAT           ; ELSE SAY: "WHAT?"
 
-HALT_:          HALT                    ; HALT CPU (return to analyser)
+BYE:            HALT                    ; HALT CPU (return to analyser)
 
 ;
 ; *************************************************************
@@ -1463,20 +1484,19 @@ PS1:            LD      A,(DE)          ; GET A CHARACTER
                 JR      NZ,PS1          ; NO, NEXT
                 RET                     ; YES, RETURN
 ;
-QTSTG:          TSTC    $22,QT3         ; *** QTSTG ***
+QTSTG:          TSTC    $22,QT4         ; *** QTSTG ***
                 LD      A,22H           ; IT IS A '"'
 QT1:            CALL    PRTSTG          ; PRINT UNTIL ANOTHER
 QT1A:           CP      CR              ; WAS LAST ONE A CR?
                 POP     HL              ; HACK RETURN ADDRESS
                 JP      Z,RUNNXL        ; WAS CR, RUN NEXT LINE
-QT2:            INC     HL              ; !! SKIP 3 BYTES ON RETURN
-                INC     HL              ; !! -> AFTER "CALL QTSTG"
-                INC     HL              ; !!    MUST BE "JP .."
-                JP      (HL)            ; !! RETURN AFTER THIS "JP"
+QT2:            INC     HL              ; !! -> AFTER "CALL QTSTG"
+                INC     HL              ; !!    MUST BE "JR .."
+                JP      (HL)            ; !! RETURN AFTER THIS "JR"
 ;
-QT3:            TSTC    $27,QT4         ; IS IT A "'"?
-                LD      A,27H           ; YES, DO THE SAME
-                JR      QT1             ; AS IN '"'
+;QT3:            TSTC    $27,QT4         ; IS IT A "'"?
+;                LD      A,27H           ; YES, DO THE SAME
+;                JR      QT1             ; AS IN '"'
 ;
 QT4:            TSTC    $5F,QT5         ; IS IT UNDERLINE?
                 LD      A,08DH          ; YES, CR WITHOUT LF
@@ -1710,11 +1730,12 @@ EX5:            LD      A,(HL)          ; LOAD HL WITH THE JUMP
                 JP      (HL)            ; AND WE GO DO IT
 ;
 
-; THE TABLES CONSISTS OF ANY NUMBER OF ITEMS.  EACH ITEM
-; IS A STRING OF CHARACTERS WITH BIT 7 SET TO 0 AND
-; A JUMP ADDRESS STORED HI-LOW WITH BIT 7 OF THE HIGH
-; BYTE SET TO 1.
-; This is done by the macro 'DWA'.
+; THE TABLES CONSISTS OF ANY NUMBER OF ITEMS.  EACH ITEM IS:
+; - A STRING OF 7 BIT ASCII CHARACTERS
+;   The string shall be defined with ".ASCII" to allow
+;   the creation of the command list document "token.txt"
+; - A JUMP ADDRESS STORED HI-LOW WITH BIT 7 OF HIGH BYTE SET.
+;   This is done by the macro 'DWA'.
 ; If the program is executed from an address < 0x8000
 ; take care to mask this bit in program part 'EXEC'.
 ;
@@ -1724,84 +1745,86 @@ EX5:            LD      A,(HL)          ; LOAD HL WITH THE JUMP
 
 ;
 TAB1:                                   ; DIRECT ONLY COMMANDS
-                .DB     "LIST"
-                DWA     LIST_
-                .DB     "RUN"
+                .ASCII  "LIST"          ; List program code (DIRECT ONLY)
+                DWA     LIST
+                .ASCII  "RUN"           ; Execute program (DIRECT ONLY)
                 DWA     RUN
-                .DB     "NEW"
+                .ASCII  "NEW"           ; Clear program code (DIRECT ONLY)
                 DWA     NEW
 ;
 TAB2:                                   ; DIRECT OR PROGRAM STATEMENT
-                .DB     "NEXT"
+                .ASCII  "NEXT"          ; Next loop iteration
                 DWA     NEXT
-                .DB     "LET"           ; can be omitted
+                .ASCII  "LET"           ; Variable assignment, can be omitted
                 DWA     LET
-                .DB     "IF"
+                .ASCII  "IF"            ; Test condition
                 DWA     IF_
-                .DB     "GOTO"
+                .ASCII  "GOTO"          ; Go to program line
                 DWA     GOTO
-                .DB     "GOSUB"
+                .ASCII  "GOSUB"         ; Call subroutine
                 DWA     GOSUB
-                .DB     "RETURN"
+                .ASCII  "RETURN"        ; Return from subroutine
                 DWA     RETURN
-                .DB     "REM"
+                .ASCII  "REM"           ; Remark, ignore rest of line
                 DWA     REM
-                .DB     "FOR"
+                .ASCII  "FOR"           ; Start a program loop
                 DWA     FOR
-                .DB     "INPUT"         ; wait for KBD input
+                .ASCII  "INPUT"         ; Wait for KBD input
                 DWA     INPUT
-                .DB     "PRINT"
+                .ASCII  "PRINT"         ; Output values
                 DWA     PRINT
-                .DB     "?"             ; short for PRINT
+                .ASCII  "?"             ; Short for PRINT
                 DWA     PRINT
-                .DB     "PUT"           ; PUT ADDR, VAL, VAL,...
+                .ASCII  "PUT"           ; PUT ADDR, VAL, VAL,... put VAL.. into RAM at ADR++
                 DWA     PUT
-                .DB     "STOP"          ; warm start
+                .ASCII  "STOP"          ; Warm start
                 DWA     STOP
-                .DB     "HALT"          ; HALT CPU (return to analyser)
-                DWA     HALT_
+                .ASCII  "BYE"           ; HALT Z80 CPU (return to analyser)
+                DWA     BYE
                 DWA     DEFLT           ; END OF LIST
 ;
 TAB4:                                   ; FUNCTIONS AND CONSTANTS
-                .DB     "RND"           ; funct RND(RANGE)
+                .ASCII  "RND"           ; Function RND(RANGE), get random [0..RANGE[
                 DWA     RND
-                .DB     "ABS"           ; funct ABS(VALUE)
+                .ASCII  "ABS"           ; Function ABS(ARG), return absolute value of ARG
                 DWA     ABS
-                .DB     "GET"           ; funct GET(ADR) get byte from memory
+                .ASCII  "GET"           ; Function GET(ADR), get byte from memory at ADR
                 DWA     GET
-                .DB     "USR"           ; funct USR(PARA) call usr funct at TOP
-                DWA     USR             ; and return a result in HL
-                .DB     "SIZE"          ; const SIZE - no parantesis, get free mem
+                .ASCII  "USR"           ; Function USR(ARG), call function at TOP, return HL
+                DWA     USR
+                .ASCII  "CALL"          ; Function CALL(ADR), call opcode at ADR
+                DWA     CALL
+                .ASCII  "SIZE"          ; Constant SIZE, get size of free memory
                 DWA     SIZE
-                .DB     "TOP"           ; const TOP - no par., get TEXT TOP = USRSPC
+                .ASCII  "TOP"           ; Constant TOP, get address of TEXT TOP = USRSPC
                 DWA     TOP
                 DWA     XP40            ; END OF LIST
 ;
 TAB5:                                   ; "TO" IN "FOR"
-                .DB     "TO"
+                .ASCII  "TO"            ; Final value of loop counter
                 DWA     FR1
                 DWA     QWHAT           ; END OF LIST
 ;
 TAB6:                                   ; "STEP" IN "FOR"
-                .DB     "STEP"
+                .ASCII  "STEP"          ; Increment value for loop counter
                 DWA     FR2
                 DWA     FR3             ; END OF LIST
 ;
 TAB8:                                   ; RELATION OPERATORS
-                .DB     ">="
-                DWA     XP11
-                .DB     "#"
-                DWA     XP12
-                .DB     "<>"
-                DWA     XP12
-                .DB     ">"
-                DWA     XP13
-                .DB     "="
-                DWA     XP15
-                .DB     "<="
-                DWA     XP14
-                .DB     "<"
-                DWA     XP16
+                .ASCII  "="             ; Operator equal
+                DWA     XPEQ
+                .ASCII  "#"             ; Operator not equal
+                DWA     XPNE
+                .ASCII  "<>"            ; Operator not equal
+                DWA     XPNE
+                .ASCII  "<="            ; Operator less or equal
+                DWA     XPLE
+                .ASCII  "<"             ; Operator less than
+                DWA     XPLT
+                .ASCII  ">="            ; Operator greater or equal
+                DWA     XPGE
+                .ASCII  ">"             ; Operator greater than
+                DWA     XPGT
                 DWA     XP17            ; END OF REL OPERATOR LIST
 
 ;

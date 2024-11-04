@@ -1,0 +1,33 @@
+  "LIST"          ; List program code (DIRECT ONLY)
+  "RUN"           ; Execute program (DIRECT ONLY)
+  "NEW"           ; Clear program code (DIRECT ONLY)
+  "NEXT"          ; Next loop iteration
+  "LET"           ; Variable assignment, can be omitted
+  "IF"            ; Test condition
+  "GOTO"          ; Go to program line
+  "GOSUB"         ; Call subroutine
+  "RETURN"        ; Return from subroutine
+  "REM"           ; Remark, ignore rest of line
+  "FOR"           ; Start a program loop
+  "INPUT"         ; Wait for KBD input
+  "PRINT"         ; Output values
+  "?"             ; Short for PRINT
+  "PUT"           ; PUT ADDR, VAL, VAL,... put VAL.. into RAM at ADR++
+  "STOP"          ; Warm start
+  "BYE"           ; HALT Z80 CPU (return to analyser)
+  "RND"           ; Function RND(RANGE), get random [0..RANGE[
+  "ABS"           ; Function ABS(ARG), return absolute value of ARG
+  "GET"           ; Function GET(ADR), get byte from memory at ADR
+  "USR"           ; Function USR(ARG), call function at TOP, return HL
+  "CALL"          ; Function CALL(ADR), call opcode at ADR
+  "SIZE"          ; Constant SIZE, get size of free memory
+  "TOP"           ; Constant TOP, get address of TEXT TOP = USRSPC
+  "TO"            ; Final value of loop counter
+  "STEP"          ; Increment value for loop counter
+  "="             ; Operator equal
+  "#"             ; Operator not equal
+  "<>"            ; Operator not equal
+  "<="            ; Operator less or equal
+  "<"             ; Operator less than
+  ">="            ; Operator greater or equal
+  ">"             ; Operator greater than

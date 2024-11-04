@@ -908,17 +908,20 @@ and the functions `ABS(n)` and `RND(n)`.
 Originally written in 8080 syntax I converted it to the nicer Z80 syntax using the
 [8080 z80](https://hc-ddr.hucki.net/wiki/doku.php/cpm/8080_z80) tool and assembled it with the
 [zmac](https://github.com/gp48k/zmac) assembler (with [one fix](https://github.com/Ho-Ro/zmac/tree/fix_hash)).
-I also added some HW-oriented functionality like `GET(addr)`, `PUT addr,val,val,...`
-as well as hex constants that are written as `$xxxx` and the possibility to print values as `uint16_t`
+I also added some HW-oriented functionality like `GET(addr)`, `PUT addr,val,val,...` as well as char constants (`'x'`)
+and hex constants that are written as `$xxxx` and the possibility to print values as `uint16_t`
 in different number bases n=2..16 using the format specifier `%n`, e.g.
 `PRINT %16,expression,...` prints in unsigned hex up to the end of this `PRINT` statement.
-The BASIC statement `HALT` executes the Z80 opcode `HALT` with which the Arduino exits
+The BASIC statement `BYE` executes the Z80 opcode `HALT` with which the Arduino exits
 the execution loop and returns to the command input.
 
+An up-to-date list of [currently recognised Basic tokens](TinyBasic2/tb2_token.txt) is created with every build. *Tiny BASIC* supports
+the arithmetic operators `*`, `/`, `&` (level 3), `+`, `-`, `|` (level 2) and the logical operators
+`=`, `#` or `<>`, `<=`, `<`, `>=`, `>` (level 1) with decreasing priority level.
 The Tiny BASIC interpreter with my additions still uses 2K ROM and 6.5K RAM and can be started with the command `BT`:
 
 ```
-TinyBASIC
+TB2
 
 OK
 >
@@ -953,10 +956,13 @@ OK
 Depending on the context `t.` could either be the constant `top` or the statement `to`,
 same for `get()` and `goto`.
 
-This part puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it via the funtion `USR(123)`.
+The `USR()` function calls the Z80 opcode at address `TOP` (i.e. RAM end - 0x100) with the
+argument passed in register `HL` and returns the result in register `HL`.
+This not very useful example puts the Z80 opcodes `INC HL` and `RET` into the `USR` program space and calls it
+via the funtion `USR(123)`.
 
 ```
->put top,$23,$c9
+>put top,$23,$c9; REM: INC HL;  RET
 
 OK
 >print usr(123)
@@ -965,7 +971,17 @@ OK
 OK
 ```
 
-To exit Tiny Basic execute `HALT`, this halts the Z80 CPU and exits to the analyser loop.
+The `USR` function can also be used to output single ASCII chars:
+
+```
+>put top,$7d,$d7,$c9; REM: LD A,L;  RST ROUTC;  RET
+>for a='A' to 'Z'; x=usr(a|$20); next a; x=usr($0d); REM: Tolower
+abcdefghijklmnopqrstuvwxyz
+
+OK
+```
+
+To exit Tiny Basic execute `BYE`, this halts the Z80 CPU and exits to the analyser loop.
 
 ## Nascom ROM Basic
 
@@ -986,7 +1002,7 @@ My 1st computer back in 1980 was a [Nascom 2 kit](https://en.wikipedia.org/wiki/
 ```
 Memory top?
 NASCOM ROM BASIC Ver 4.7b
-Copyright (c) 1978 by Microsoft
+Copyright (C) 1978 by Microsoft
 6339 Bytes free
 Ok
 ```

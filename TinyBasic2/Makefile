@@ -23,6 +23,7 @@ tinybasic2_rom.cim: tinybasic2.asm Makefile
 
 tinybasic2.cim: tinybasic2.asm Makefile
 	zmac -c -o $@ -o tinybasic2.lst $<
+	grep '.ASCII  "' tinybasic2.asm | cut -d\I -f3- > tb2_token.txt
 
 obj2h: obj2h.cpp
 	gcc -Wall -o $@ $<
