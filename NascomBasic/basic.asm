@@ -238,7 +238,7 @@ BRKRET: CALL    CLREG           ; Clear registers and stack
 BFREE:  .DB  " Bytes free",CR,LF,0,0
 
 SIGNON: .DB  "NASCOM ROM BASIC Ver 4.7b",CR,LF
-        .DB  "Copyright (c) 1978 by Microsoft",CR,LF,0,0
+        .DB  "Copyright (C) 1978 by Microsoft",CR,LF,0,0
 
 MEMMSG: .DB  "Memory top",0
 

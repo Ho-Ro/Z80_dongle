@@ -92,7 +92,7 @@ DWA             .MACRO   LABEL
                 .DB     LOW LABEL
                 .ENDM
 
-; if CHAR = A THEN JUMP RELATIVE TO LABEL
+; if CHAR != A THEN JUMP RELATIVE TO LABEL
 
 TSTC            .MACRO   CHAR,LABEL
                 RST     RTSTC
@@ -104,9 +104,8 @@ TSTC            .MACRO   CHAR,LABEL
                 .ORG    ROMBGN
 
 CSTART:         LD      SP,STACK        ; *** COLD START ***
-                XOR     A               ; must be 2 byte
+                LD      A,$C9           ; must be 2 byte
                 JP      INIT            ; as delimiter for PRTSTG
-                .DB     "L"             ; FILL ONE BYTE
 
 
 RTSTC:          EX      (SP),HL         ; *** RST 1 @ $0008 ***
@@ -127,7 +126,7 @@ ROUTC:          OUT     (IODATA),A      ; Out to data port
 REXPR:          CALL    EXPR2           ; *** RST 3 @ $0018 ***
                 PUSH    HL              ; EVALUATE AN EXPRESSION
                 JP      EXPR1           ; REST OF IT AT EXPR1
-                .DB     "C"             ; FILL ONE BYTE
+                .DB     'W'             ; FILL ONE BYTE
 
 
 RCOMP:          LD      A,H             ; *** RST 4 @ $0020 ***
@@ -136,7 +135,8 @@ RCOMP:          LD      A,H             ; *** RST 4 @ $0020 ***
                 LD      A,L             ; Z FLAGS
                 CP      E               ; BUT OLD A IS LOST
                 RET
-                .DB     "WA"            ; FILL TWO BYTES
+                NOP
+                .DB     'A'             ; FILL ONE BYTE
 
 
 RIGNBLK:        LD      A,(DE)          ; *** RST 5 @ $0028 ***
@@ -144,13 +144,13 @@ RIGNBLK:        LD      A,(DE)          ; *** RST 5 @ $0028 ***
                 RET     NZ              ; IN TEXT (WHERE DE->)
                 INC     DE              ; AND RETURN THE FIRST
                 JR      RIGNBLK         ; NON-BLANK CHAR. IN A
-                .DB     "N"             ; FILL ONE BYTE
+                .DB     'N'             ; FILL ONE BYTE
 
 
 RFINISH:        POP     AF              ; *** RST 6 @ $0030 ***
                 CALL    FIN             ; CHECK END OF COMMAND
                 JP      QWHAT           ; PRINT "WHAT?" IF WRONG
-                .DB     "G"             ; FILL ONE BYTE
+                .DB     'G'             ; FILL ONE BYTE
 
 
 RTSTV:          RST     RIGNBLK         ; *** RST 7 @ $0038 ***
@@ -191,7 +191,7 @@ TV2:            CP      1BH             ; <='Z'
                 LD      H,A
                 RET
 
-; TSTC:         EX      (SP),HL         ; *** TSTC OR RST 1 ***
+; RTSTC:        EX      (SP),HL         ; *** TSTC OR RST 1 ***
 ;               RST     RIGNBLK         ; THIS IS AT LOC. 8
 ;               CMP     (HL)            ; AND THEN JUMP HERE
 ;               INC     HL              ; COMPARE THE FOLLOWING BYTE
@@ -211,23 +211,21 @@ TC2:            INC     DE              ; IF =, SKIP THOSE BYTES
 
 TSTNUM:         LD      HL,0            ; *** TSTNUM ***
                 LD      B,H             ; TEST IF THE TEXT IS A NUMBER
-                RST     RIGNBLK         ; Skip spaces
-                CP      '$'             ; HEX NUMBER?
-                JR      Z,TX1           ; YES
-                CP      "'"             ; Is it a char constant?
-                JR      NZ,TN1          ; No, check if normal number
-                INC     DE              ; Skip "'"
-                LD      A,(DE)          ; Get one char
-                LD      L,A             ;
-                INC     DE              ; Skip the char
-                LD      A,(DE)
-                CP      "'"             ; Closing "'"?
+                TSTC    "'",TN1         ; If not char const check for number
+                LD      A,(DE)          ; Get the char
+                LD      L,A
+                INC     DE              ; Skip char
+                LD      A,(DE)          ; Followed by
+                CP      "'"             ; closing "'"?
                 JR      NZ,WHAT         ; No -> syntax error
-                INC     DE              ; Skip the "'"
-                INC     B               ; Min. 1 digit
+                INC     DE              ; Skip the closing "'"
+                INC     B               ; At least 1 digit
                 RET
-TN1:            CP      '0'             ; IF NOT, RETURN 0 IN
-                RET     C               ; B AND HL
+;
+TN1:            CP      '$'             ; HEX NUMBER?
+                JR      Z,TX1           ; YES
+TN2:            CP      '0'             ; IF NOT A DIGIT,
+                RET     C               ; RETURN 0 IN B AND HL
                 CP      '9'+1           ; IF NUMBERS, CONVERT
                 RET     NC              ; TO BINARY IN HL AND
                 LD      A,0F0H          ; SET B TO # OF DIGITS
@@ -251,10 +249,10 @@ TN1:            CP      '0'             ; IF NOT, RETURN 0 IN
                 LD      H,A
                 POP     BC
                 LD      A,(DE)          ; DO THIS DIGIT AFTER
-                JP      P,TN1           ; DIGIT. S SAYS OVERFLOW
+                JP      P,TN2           ; DIGIT. S SAYS OVERFLOW
 ;
                                         ; OUTPUT HEX NUMBER
-TX1:            INC     DE              ; SKIP TO NEXT HEX
+TX1:            INC     DE              ; SKIP TO NEXT DIGIT POSITION
                 LD      A,(DE)          ; GET HEX DIGIT
                 CP      '0'             ; < '0'
                 RET     C               ; ERROR
@@ -288,7 +286,7 @@ QHOW:           PUSH    DE              ; *** ERROR "HOW?" ***
 AHOW:           LD      DE,HOW
                 JP      ERROR
 
-TIBAS:          .DB     "TB2"; "TinyBASIC2"
+TIBAS:          .DB     "TinyBASIC2"
                 .DB     CR
 
 HOW:            .DB     "HOW?"
@@ -385,19 +383,13 @@ CI0:            CP      03H             ; IS IT CONTROL-C?
 ;
                                         ; THIS IS AT LOC. 0
 ; CSTART:       LD      SP,STACK        ; *** COLD START ***
-;               XOR     A               ;
-;               JP      INIT            ;
+;               LD      A,$C9           ; must be 2 byte
+;               JP      INIT            ; as delimiter for PRTSTG
 ;
 INIT:
-                LD      HL,RAMBGN       ; SOURCE
-                LD      (HL),A          ; CLEAR MEM
-                LD      DE,RAMBGN+1     ; DESTINATION
-                LD      BC,RAMSZE-1     ; BYTE COUNT
-                LDIR                    ; CLR COMPLETE MEMORY
+                LD      (USRSPC),A      ; "RET" AT USR CODE SPACE
                 LD      DE,TIBAS        ; COLD START MESSAGE
                 CALL    PRTSTG
-                LD      A,$C9
-                LD      (USRSPC),A      ; "RET" AT USR CODE SPACE
                 LD      HL,CSTART       ; INIT RANDOM POINTER
                 LD      (RANPNT),HL
                 LD      HL,TXTBGN       ; UNFILLED TEXT
@@ -832,7 +824,7 @@ NX2:            CALL    POPA            ; PURGE THIS LOOP
 REM:            LD      HL,0H           ; *** REM ***
                 .DB     3EH             ; SKIP RST, THIS IS LIKE 'IF 0'
 ;
-IF_:            RST     REXPR           ; *** IF ***
+IFF:            RST     REXPR           ; *** IF ***
                 LD      A,H             ; IS THE EXPR.=0?
                 OR      L
                 JP      NZ,RUNSML       ; NO, CONTINUE
@@ -1388,13 +1380,13 @@ GL1:            CALL    CHKIO           ; CHECK KEYBOARD
                 JR      Z,GL3           ; YES
                 CP      DEL             ; DEL, DELETE LAST CHARACTER?
                 JR      Z,GL3           ; YES
-                RST     ROUTC           ; INPUT, ECHO BACK
+                CP      CAN             ; ^X, DELETE THE WHOLE LINE?
+                JR      Z,GL4           ; YES
                 CP      LF              ; IGNORE LF
                 JR      Z,GL1
                 OR      A               ; IGNORE NULL
                 JR      Z,GL1
-                CP      CAN             ; ^X, DELETE THE WHOLE LINE?
-                JR      Z,GL4           ; YES
+                RST     ROUTC           ; INPUT, ECHO BACK
                 LD      (DE),A          ; ELSE SAVE INPUT
                 INC     DE              ; AND BUMP POINTER
                 CP      CR              ; WAS IT CR?
@@ -1758,7 +1750,7 @@ TAB2:                                   ; DIRECT OR PROGRAM STATEMENT
                 .ASCII  "LET"           ; Variable assignment, can be omitted
                 DWA     LET
                 .ASCII  "IF"            ; Test condition
-                DWA     IF_
+                DWA     IFF
                 .ASCII  "GOTO"          ; Go to program line
                 DWA     GOTO
                 .ASCII  "GOSUB"         ; Call subroutine
@@ -1775,7 +1767,7 @@ TAB2:                                   ; DIRECT OR PROGRAM STATEMENT
                 DWA     PRINT
                 .ASCII  "?"             ; Short for PRINT
                 DWA     PRINT
-                .ASCII  "PUT"           ; PUT ADDR, VAL, VAL,... put VAL.. into RAM at ADR++
+                .ASCII  "PUT"           ; PUT ADDR, EXPR, EXPR,... put bytes.. into RAM at ADDR++
                 DWA     PUT
                 .ASCII  "STOP"          ; Warm start
                 DWA     STOP

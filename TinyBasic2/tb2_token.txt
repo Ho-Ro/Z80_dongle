@@ -12,7 +12,7 @@
   "INPUT"         ; Wait for KBD input
   "PRINT"         ; Output values
   "?"             ; Short for PRINT
-  "PUT"           ; PUT ADDR, VAL, VAL,... put VAL.. into RAM at ADR++
+  "PUT"           ; PUT ADDR, EXPR, EXPR,... put bytes.. into RAM at ADDR++
   "STOP"          ; Warm start
   "BYE"           ; HALT Z80 CPU (return to analyser)
   "RND"           ; Function RND(RANGE), get random [0..RANGE[
