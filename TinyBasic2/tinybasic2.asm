@@ -154,7 +154,7 @@ RFINISH:        POP     AF              ; *** RST 6 @ $0030 ***
 
 
 RTSTV:          RST     RIGNBLK         ; *** RST 7 @ $0038 ***
-                SUB     '@'             ; TEST VARIABLES
+RTV1:           SUB     '@'             ; TEST VARIABLES
                 RET     C               ; C: < '@', NOT A VARIABLE
                 JR      NZ,TV1          ; NZ: NOT THE '@' ARRAY
 ;
@@ -173,8 +173,7 @@ RTSTV:          RST     RIGNBLK         ; *** RST 7 @ $0038 ***
                 CALL    SUBDE           ; OF @(EXPR) AND PUT IT
                 POP     DE              ; IN HL (top-down from TXTEND)
                 RET                     ; C FLAG IS CLEARED
-;
-                                        ; VARIABLES 'A'..'Z'
+                                        ; VARIABLES 'A'..'Z' -> 1..26
 TV1:            CP      21H             ; >='a'?
                 JR      C,TV2           ; NO
                 SUB     20H             ; MAKE UPPER CASE
@@ -211,7 +210,7 @@ TC2:            INC     DE              ; IF =, SKIP THOSE BYTES
 
 TSTNUM:         LD      HL,0            ; *** TSTNUM ***
                 LD      B,H             ; TEST IF THE TEXT IS A NUMBER
-                TSTC    "'",TN1         ; If not char const check for number
+                TSTC    "'",TN1         ; If not char const 'x' check for number
                 LD      A,(DE)          ; Get the char
                 LD      L,A
                 INC     DE              ; Skip char
@@ -251,7 +250,6 @@ TN2:            CP      '0'             ; IF NOT A DIGIT,
                 LD      A,(DE)          ; DO THIS DIGIT AFTER
                 JP      P,TN2           ; DIGIT. S SAYS OVERFLOW
 ;
-                                        ; OUTPUT HEX NUMBER
 TX1:            INC     DE              ; SKIP TO NEXT DIGIT POSITION
                 LD      A,(DE)          ; GET HEX DIGIT
                 CP      '0'             ; < '0'
@@ -509,11 +507,9 @@ RUNNXL:         LD      HL,0            ; *** RUNNXL ***
                 CALL    FNDLP           ; FIND WHATEVER LINE #
                 JP      C,WSTART        ; C:PASSED TXTUNF, QUIT
 ;
-RUNTSL:         EX      DE,HL           ; *** RUNTSL ***
-                LD      (CURRNT),HL     ; SET 'CURRENT'->LINE #
-                EX      DE,HL
+RUNTSL:         LD      (CURRNT),DE     ; *** RUNTSL ***
+                INC     DE              ; SET 'CURRENT'->LINE #
                 INC     DE              ; BUMP PASS LINE #
-                INC     DE
 ;
 RUNSML:         CALL    CHKIO           ; *** RUNSML ***
                 LD      HL,TAB2-1       ; FIND COMMAND IN TAB2
@@ -576,7 +572,7 @@ PRINT:          XOR     A               ; DEFAULT BASE FOR PRTNUM
                 CALL    CRLF            ; GIVE CR-LF AND
                 JR      RUNSML          ; CONTINUE SAME LINE
 PR2:            TSTC    CR,PR0          ; IF NULL LIST (CR)
-                CALL    CRLF            ; ALSO GIVE CR-LF AND
+                RST     ROUTC           ; ALSO GIVE CR-LF AND
                 JR      RUNNXL          ; GO TO NEXT LINE
 PR0:            TSTC    '#',PR5         ; ELSE IS IT FORMAT?
                 RST     REXPR           ; YES, EVALUATE EXPR.
@@ -612,7 +608,7 @@ PR8:            RST     REXPR           ; EVALUATE THE EXPR
 ;
 ; 'GOSUB EXPR;' OR 'GOSUB EXPR (CR)' IS LIKE THE 'GOTO'
 ; COMMAND, EXCEPT THAT THE CURRENT TEXT POINTER, STACK POINTER
-; ETC. ARE SAVE SO THAT EXECUTION CAN BE CONTINUED AFTER THE
+; ETC. ARE SAVED SO THAT EXECUTION CAN BE CONTINUED AFTER THE
 ; SUBROUTINE 'RETURN'.  IN ORDER THAT 'GOSUB' CAN BE NESTED
 ; (AND EVEN RECURSIVE), THE SAVE AREA MUST BE STACKED.
 ; THE STACK POINTER IS SAVED IN 'STKGOS', THE OLD 'STKGOS' IS
@@ -634,10 +630,9 @@ GOSUB:          CALL    PUSHA           ; SAVE THE CURRENT "FOR"
                 PUSH    HL              ; 'CURRNT' OLD 'STKGOS'
                 LD      HL,(STKGOS)
                 PUSH    HL
-                SBC     HL,HL           ; CY=0, shorter than LD HL,0
+                SBC     HL,HL           ; CY==0, shorter than LD HL,0
                 LD      (LOPVAR),HL     ; LOAD NEW ONES
-                ADD     HL,SP
-                LD      (STKGOS),HL
+                LD      (STKGOS),SP
                 JP      RUNTSL          ; THEN RUN THAT LINE
 ;
 RETURN:         CALL    ENDCHK          ; THERE MUST BE A CR
@@ -685,6 +680,7 @@ RETURN:         CALL    ENDCHK          ; THERE MUST BE A CR
 ; FOLLOWING THE 'FOR'.  IF OUTSIDE THE LIMIT, THE SAVE AREA
 ; IS PURGED AND EXECUTION CONTINUES.
 ;
+STKLVL:         .EQU    10              ; SIZE OF ONE STACK LEVEL
 FOR:            CALL    PUSHA           ; SAVE THE OLD SAVE AREA
                 CALL    SETVAL          ; SET THE CONTROL VAR.
                 DEC     HL              ; HL IS ITS ADDRESS
@@ -703,7 +699,7 @@ FR5:            LD      HL,(CURRNT)     ; SAVE CURRENT LINE #
                 LD      (LOPLN),HL
                 EX      DE,HL           ; AND TEXT POINTER
                 LD      (LOPPT),HL
-                LD      BC,0AH          ; DIG INTO STACK TO
+                LD      BC,STKLVL       ; DIG INTO STACK TO
                 LD      HL,(LOPVAR)     ; FIND 'LOPVAR'
                 EX      DE,HL
                 LD      H,B
@@ -723,13 +719,13 @@ FR7:            ADD     HL,BC           ; EACH LEVEL IS 10 DEEP
                 CP      E
                 JR      NZ,FR7
                 EX      DE,HL           ; YES, FOUND ONE
-                LD      HL,0H
+                SBC     HL,HL           ; CY==0 -> HL:=0
                 ADD     HL,SP           ; TRY TO MOVE SP
                 LD      B,H
                 LD      C,L
-                LD      HL,0AH
-                ADD     HL,DE
-                CALL    MVDOWN          ; AND PURGE 10 WORDS
+                LD      HL,STKLVL       ; ONE LEVEL IS 10
+                ADD     HL,DE           ; BYTES DEEP
+                CALL    MVDOWN          ; AND PURGE 1 LEVEL
                 LD      SP,HL           ; IN THE STACK
 FR8:            LD      HL,(LOPPT)      ; JOB DONE, RESTORE DE
                 EX      DE,HL
@@ -832,8 +828,7 @@ IFF:            RST     REXPR           ; *** IF ***
                 JP      NC,RUNTSL       ; AND RUN THE NEXT LINE
                 JP      WSTART          ; IF NO NEXT, RE-START
 ;
-INPERR:         LD      HL,(STKINP)     ; *** INPERR ***
-                LD      SP,HL           ; RESTORE OLD SP
+INPERR:         LD      SP,(STKINP)     ; *** INPERR *** REST. OLD SP
                 POP     HL              ; AND OLD 'CURRNT'
                 LD      (CURRNT),HL
                 POP     DE              ; AND OLD TEXT POINTER
@@ -862,19 +857,14 @@ IP3:            PUSH    DE              ; SAVE TEXT POINTER
                 EX      DE,HL
                 LD      HL,(CURRNT)     ; ALSO SAVE 'CURRNT'
                 PUSH    HL
-                LD      HL,IP1          ; A NEGATIVE NUMBER
+                LD      HL,IP1          ; NEGATIVE LINE NUMBER HL -> $E5 $CD
                 LD      (CURRNT),HL     ; AS A FLAG
-                LD      HL,0H           ; SAVE SP TOO
-                ADD     HL,SP
-                LD      (STKINP),HL
+                LD      (STKINP),SP     ; SAVE SP
                 PUSH    DE              ; OLD HL
                 LD      A,':'           ; PRINT THIS TOO
                 CALL    GETLN           ; AND GET A LINE
                 LD      DE,BUFFER       ; POINTS TO BUFFER
                 RST     REXPR           ; EVALUATE INPUT
-                                        ; NOP            ;??? CAN BE 'CALL ENDCHK'
-                                        ; NOP
-                                        ; NOP
                 POP     DE              ; OK, GET OLD HL
                 EX      DE,HL
                 LD      (HL),E          ; SAVE VALUE IN VAR.
@@ -975,7 +965,7 @@ XP18:           LD      A,C             ; SUBROUTINE FOR ALL
                 RET
 ;
 EXPR2:          TSTC    '-',XP21        ; NEGATIVE SIGN?
-                LD      HL,0H           ; YES, FAKE '0-'
+                SBC     HL,HL           ; YES, FAKE '0-'
                 JR      XP26            ; TREAT LIKE SUBTRACT
 ;
 XP21:           TSTC    '+',XP22        ; POSITIVE SIGN? IGNORE
@@ -1376,27 +1366,28 @@ GETLN:          RST     ROUTC           ; *** GETLN ***
                 LD      DE,BUFFER       ; PROMPT AND INIT.
 GL1:            CALL    CHKIO           ; CHECK KEYBOARD
                 JR      Z,GL1           ; NO INPUT, WAIT
+                CP      CR              ; CR?
+                JR      Z,GL2           ; PROCESS LINE
                 CP      BS              ; BS, DELETE LAST CHARACTER?
                 JR      Z,GL3           ; YES
                 CP      DEL             ; DEL, DELETE LAST CHARACTER?
                 JR      Z,GL3           ; YES
                 CP      CAN             ; ^X, DELETE THE WHOLE LINE?
                 JR      Z,GL4           ; YES
-                CP      LF              ; IGNORE LF
-                JR      Z,GL1
-                OR      A               ; IGNORE NULL
-                JR      Z,GL1
-                RST     ROUTC           ; INPUT, ECHO BACK
-                LD      (DE),A          ; ELSE SAVE INPUT
+                CP      ' '             ; OTHER CTRL CHAR?
+                JR      C,GL1           ; IGNORE
+;
+GL2:            RST     ROUTC           ; VALID INPUT, ECHO
+                LD      (DE),A          ; SAVE INPUT
                 INC     DE              ; AND BUMP POINTER
                 CP      CR              ; WAS IT CR?
                 RET     Z               ; YES, END OF LINE
                 LD      A,E             ; ELSE MORE FREE ROOM?
-                CP      BUFEND & 0FFH
+                CP      LOW BUFEND
                 JR      NZ,GL1          ; YES, GET NEXT INPUT
 GL3:            LD      A,E             ; DELETE LAST CHARACTER
-                CP      BUFFER & 0FFH   ; BUT DO WE HAVE ANY?
-                JR      Z,GL4           ; NO, REDO WHOLE LINE
+                CP      LOW BUFFER      ; BUT DO WE HAVE ANY?
+                JR      Z,GL1           ; NO, REDO WHOLE LINE
                 DEC     DE              ; YES, BACKUP POINTER
                 LD      A,BS            ; AND ECHO A BACKSPACE
                 RST     ROUTC
@@ -1434,7 +1425,7 @@ FL1:            PUSH    HL              ; SAVE LINE #
 ;
 FNDNXT:                                 ; *** FNDNXT ***
                 INC     DE              ; FIND NEXT LINE
-FL2:            INC     DE              ; JUST PASSED BYTE 1 & 2
+FL2:            INC     DE              ; JUST PASSED BYTE 1 AND 2
 ;
 FNDSKP:         LD      A,(DE)          ; *** FNDSKP ***
                 CP      CR              ; TRY TO FIND CR
@@ -1449,35 +1440,36 @@ FNDSKP:         LD      A,(DE)          ; *** FNDSKP ***
 ; 'PRTSTG' PRINTS A STRING POINTED BY DE.  IT STOPS PRINTING
 ; AND RETURNS TO CALLER WHEN EITHER A CR IS PRINTED OR WHEN
 ; THE NEXT BYTE IS THE SAME AS WHAT WAS IN A (GIVEN BY THE
-; CALLER).  OLD A IS STORED IN B, OLD B IS LOST.
+; CALLER).  OLD A IS STORED IN B, OLD B IS LOST. CY = Z = 0
 ;
-; 'QTSTG' LOOKS FOR A BACK-ARROW, SINGLE QUOTE, OR DOUBLE
-; QUOTE.  IF NONE OF THESE, RETURN TO CALLER.  IF BACK-ARROW,
-; OUTPUT A CR WITHOUT A LF.  IF SINGLE OR DOUBLE QUOTE, PRINT
-; THE STRING IN THE QUOTE AND DEMANDS A MATCHING UNQUOTE.
-; HACK AFTER THE PRINTING THE NEXT 3 BYTES OF THE CALLER
-;      IS SKIPPED OVER (SHALL BE A "JP" INSTRUCTION).
+; 'QTSTG' LOOKS FOR A DOUBLE QUOTE, UNDERLINE, UP ARROW, OR BACKSLASH.
+; - IF DOUBLE QUOTE, PRINT THE STRING IN THE QUOTE UNTIL MATCHING UNQUOTE OR CR.
+; - IF UNDERLINE, OUTPUT A CR WITHOUT A LF.
+; - IF UPARROW PRINT THE ASCII VALUE OF NEXT CHAR XOR 40H, I.E. CTRL CHAR.
+; - IF BACKSLASH TAKE THE NEXT CHAR AS VARIABLE AND PRINT THE BYTE VALUE AS ASCII.
+; - IF NONE OF THESE, RETURN TO CALLER.
+; HACK AFTER THE PRINTING THE NEXT 2 BYTES OF THE CALLER
+;      IS SKIPPED OVER (SHALL BE A "JR" INSTRUCTION).
 ;
-; 'PRTNUM' PRINTS THE NUMBER IN HL.  LEADING BLANKS ARE ADDED
-; IF NEEDED TO PAD THE NUMBER OF SPACES TO THE NUMBER IN C.
-; HOWEVER, IF THE NUMBER OF DIGITS IS LARGER THAN THE # IN
-; C, ALL DIGITS ARE PRINTED ANYWAY.  NEGATIVE SIGN IS ALSO
-; PRINTED AND COUNTED IN, POSITIVE SIGN IS NOT.
+; 'PRTNUM' PRINTS THE NUMBER IN HL TO THE BASE 2..16 AS SET WITH %N in PRINT.
+; LEADING BLANKS ARE ADDED IF NEEDED TO PAD THE NUMBER OF SPACES TO THE NUMBER IN C.
+; HOWEVER, IF THE NUMBER OF DIGITS IS LARGER THAN THE # IN C,
+; ALL DIGITS ARE PRINTED ANYWAY.
+; NEGATIVE SIGN IS ALSO PRINTED AND COUNTED IN, POSITIVE SIGN IS NOT.
 ;
 ; 'PRTLN' PRINTS A SAVED TEXT LINE WITH LINE # AND ALL.
 ;
 PRTSTG:         LD      B,A             ; *** PRTSTG ***
 PS1:            LD      A,(DE)          ; GET A CHARACTER
                 INC     DE              ; BUMP POINTER
-                CP      B               ; SAME AS OLD A?
+PS2:            CP      B               ; SAME AS OLD A?
                 RET     Z               ; YES, RETURN
-                RST     ROUTC           ; ELSE PRINT IT
+PS3:            RST     ROUTC           ; ELSE PRINT IT
                 CP      CR              ; WAS IT A CR?
                 JR      NZ,PS1          ; NO, NEXT
                 RET                     ; YES, RETURN
 ;
-QTSTG:          TSTC    $22,QT4         ; *** QTSTG ***
-                LD      A,22H           ; IT IS A '"'
+QTSTG:          TSTC    $22,QT4         ; *** QTSTG *** '"'?
 QT1:            CALL    PRTSTG          ; PRINT UNTIL ANOTHER
 QT1A:           CP      CR              ; WAS LAST ONE A CR?
                 POP     HL              ; HACK RETURN ADDRESS
@@ -1492,7 +1484,7 @@ QT2:            INC     HL              ; !! -> AFTER "CALL QTSTG"
 ;
 QT4:            TSTC    $5F,QT5         ; IS IT UNDERLINE?
                 LD      A,08DH          ; YES, CR WITHOUT LF
-                RST     ROUTC
+QT4A:           RST     ROUTC
                 POP     HL              ; HACK RETURN ADDRESS
                 JR      QT2
 ;
@@ -1503,7 +1495,17 @@ QT5:            TSTC    5EH,QT6         ; RST 1, is it '^'?
                 LD      A,(DE)          ; RESTORE CHR
                 INC     DE
                 JR      QT1A
-QT6:            RET                     ; NONE OF ABOVE
+;
+QT6:            TSTC    '\',QT9         ; RST 1, is it '\'?
+                PUSH    HL
+                LD      A,(DE)
+                CALL    RTV1            ; GET VAR
+                JP      C,QWHAT         ; NO VARIABLE, "WHAT?"
+                LD      A,(HL)          ; GET BYTE VALUE
+                POP     HL
+                JR      QT4A            ; OUTPUT AS ASCII
+;
+QT9:            RET                     ; NONE OF ABOVE
 
 PRTNUM:                                 ; *** PRINT NUMBER IN HL ***
                 LD      A,(PNBASE)      ; GET NUMBER BASE
@@ -1595,10 +1597,10 @@ PRTLN:          XOR     A               ; 0 -> DEFAULT BASE 10 SIGNED
 ; UNTIL DE = BC
 ;
 ; 'POPA' RESTORES THE 'FOR' LOOP VARIABLE SAVE AREA FROM THE
-; STACK
+; STACK: LOPVAR, LOPINC, LOPLMT, LOPLN, LOPPT
 ;
 ; 'PUSHA' STACKS THE 'FOR' LOOP VARIABLE SAVE AREA INTO THE
-; STACK
+; STACK: LOPPT, LOPLN, LOPLMT, LOPINC, LOPVAR
 ;
 MVUP:           RST     RCOMP           ; *** MVUP ***
                 RET     Z               ; DE = HL, RETURN
@@ -1637,11 +1639,10 @@ POPA:           POP     BC              ; BC = RETURN ADDR.
 PP1:            PUSH    BC              ; BC = RETURN ADDR.
                 RET
 ;
-PUSHA:          LD      HL,STKLMT       ; *** PUSHA ***
-                CALL    CHGSGN
-                POP     BC              ; BC=RETURN ADDRESS
-                ADD     HL,SP           ; IS STACK NEAR THE TOP?
-                JP      NC,QSORRY       ; YES, SORRY FOR THAT
+PUSHA:          POP     BC              ; *** PUSHA *** BC=RET ADDR
+                LD      HL,-STKLMT-18   ; ENOUGH SPACE FOR 6 * PUSH HERE
+                ADD     HL,SP           ; AND POSSIBLE 3 * PUSH AT GOSUB:
+                JP      NC,QSORRY       ; NO, SORRY FOR THAT
                 LD      HL,(LOPVAR)     ; ELSE SAVE LOOP VAR'S
                 LD      A,H             ; BUT IF LOPVAR IS 0
                 OR      L               ; THAT WILL BE ALL
@@ -1822,6 +1823,7 @@ TAB8:                                   ; RELATION OPERATORS
 ;
 LSTROM:                                 ; ALL ABOVE CAN BE ROM
 
+BYTES_FREE:     .EQU    RAMBGN-LSTROM
 ;
 ; CHECK THAT THE PROGRAM DOES NOT EXCEED ROM SIZE
 ;
@@ -1852,7 +1854,7 @@ LOPLMT:         .DS     2               ; LIMIT
 LOPLN:          .DS     2               ; LINE NUMBER
 LOPPT:          .DS     2               ; TEXT POINTER
 RANPNT:         .DS     2               ; RANDOM NUMBER POINTER
-STKLMT:         .EQU    $               ; LIMIT FOR STACK
+STKLMT:         .EQU    $               ; BOTTOM LIMIT FOR STACK
 
                 .ORG    RAMBGN+$100
 ;
