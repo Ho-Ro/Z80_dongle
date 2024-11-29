@@ -4,17 +4,18 @@
 
 ; detect CPU
 ; https://github.com/EtchedPixels/FUZIX/blob/master/Applications/util/cpuinfo-z80.S
-
+; Flags:
+; S	Z	F5	H	F3	P/V	N	C
     ld sp,$80
     ld bc,0x00ff
     push bc
     pop af      ; Flags is now 0xFF A is 0. Now play with XF and YF
-    scf         ; Will give us 0 for NEC clones, 28 for Zilog
+    scf         ; Will give us xx0x0xx1 for NEC clones, xx1x1xx1 for Zilog
     nop
     push af
     pop bc
     ld a,c
-    and $28
+    and $28     ; NEC: 0x00; Zilog: 0x28
     out (1),a
 
     nop
