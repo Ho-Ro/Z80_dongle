@@ -1855,6 +1855,7 @@ LOPLN:          .DS     2               ; LINE NUMBER
 LOPPT:          .DS     2               ; TEXT POINTER
 RANPNT:         .DS     2               ; RANDOM NUMBER POINTER
 STKLMT:         .EQU    $               ; BOTTOM LIMIT FOR STACK
+                                        ; ENOUGH SPACE FOR 20 NESTED GOSUBS
 
                 .ORG    RAMBGN+$100
 ;

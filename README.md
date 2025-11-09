@@ -1017,9 +1017,9 @@ To exit Nascom ROM Basic execute `MONITOR`, this halts the Z80 CPU and exits to 
 ## 1K Tiny BASIC
 
 [Will Stevens' basic1K](https://github.com/WillStevens/basic1K) is the smallest Basic for Z80 processors,
-it fits into 1K ROM. It has similar features as the original tiny Basic, i.e. only ´int16_t´ arithmetic,
+it fits into 1K ROM. It has similar features as the original tiny Basic, i.e. only `int16_t` arithmetic,
 26 variables `A` to `Z`, functions `ABS()`, `PEEK()`, `RND()`, and `USR()`, but a key difference is that
 1K Tiny BASIC is tokenised rather than being parsed at run-time, so it executes faster.
-Will's source code can be assembled with `zmac` (after some reformatting), ´basic1K´ can be started with `B1`.
+Will's source code can be assembled with `zmac` (after some reformatting), `basic1K` can be started with `B1`.
 `basic1K` has no command to exit, but you can type e.g. `LET A=118 LET A=USR(1026)`, this puts 0x76 (Z80 `HALT`)
 at address 1026 and calls address 1026. The `HALT` command halts the Z80 and exits to the analyser loop.
